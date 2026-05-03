@@ -1,5 +1,7 @@
 // AI Service - supports local (Ollama) and cloud (OpenAI-compatible) AI providers
 
+import db from '@/lib/db';
+
 export interface AIConfig {
   provider: 'ollama' | 'openai' | 'anthropic' | 'deepseek';
   apiKey?: string;
@@ -23,8 +25,29 @@ export interface AIResponse {
   };
 }
 
-// Get AI configuration from environment
+// Get AI configuration from database or environment
 function getConfig(): AIConfig {
+  // First try database settings
+  try {
+    const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+    const settings: Record<string, string> = {};
+    for (const row of rows) {
+      settings[row.key] = row.value;
+    }
+    
+    if (settings.ai_provider) {
+      return {
+        provider: settings.ai_provider as AIConfig['provider'],
+        apiKey: settings.ai_api_key || undefined,
+        baseUrl: settings.ai_base_url || 'http://localhost:11434',
+        model: settings.ai_model || getDefaultModel(settings.ai_provider),
+      };
+    }
+  } catch (e) {
+    // Database not available, fall back to env
+  }
+  
+  // Fall back to environment variables
   const provider = process.env.AI_PROVIDER || 'ollama';
   
   return {

@@ -1,17 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const router = useRouter();
   const [mode, setMode] = useState<'choice' | 'create' | 'join'>('choice');
+  const [mounted, setMounted] = useState(false);
   const [campaignName, setCampaignName] = useState('');
   const [dmName, setDmName] = useState('');
   const [campaignCode, setCampaignCode] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Ensure client-side hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +81,8 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Choice Cards */}
-        {mode === 'choice' && (
+        {/* Choice Cards - show on mount */}
+        {mode === 'choice' && mounted && (
           <div className="grid grid-2 gap-lg max-w-3xl mx-auto">
             <button
               onClick={() => setMode('create')}
