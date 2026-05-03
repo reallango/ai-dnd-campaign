@@ -62,10 +62,10 @@ export default function DMDashboard() {
   const loadCampaignData = useCallback(async () => {
     try {
       const [campaignRes, playersRes, diceRes, aiRes] = await Promise.all([
-        fetch(`/api/campaigns/${code}`),
-        fetch(`/api/players?campaignId=`),
-        fetch(`/api/dice?campaignId=&limit=20`),
-        fetch(`/api/ai`),
+        fetch(`https://gm-assist.intisive.com/api/campaigns/${code}`),
+        fetch(`https://gm-assist.intisive.com/api/players?campaignId=`),
+        fetch(`https://gm-assist.intisive.com/api/dice?campaignId=&limit=20`),
+        fetch(`https://gm-assist.intisive.com/api/ai`),
       ]);
       
       const campaignData = await campaignRes.json();
@@ -102,7 +102,7 @@ export default function DMDashboard() {
     setGenerating(true);
     setAiError('');
     try {
-      const response = await fetch('/api/ai', {
+      const response = await fetch('https://gm-assist.intisive.com/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -140,7 +140,7 @@ export default function DMDashboard() {
     if (!diceInput.trim()) return;
     
     try {
-      const response = await fetch('/api/dice', {
+      const response = await fetch('https://gm-assist.intisive.com/api/dice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
