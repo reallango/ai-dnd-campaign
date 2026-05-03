@@ -1,0 +1,7 @@
+# Dockerignore
+node_modules
+.next
+.git
+*.log
+campaign.db
+.DS_Store
