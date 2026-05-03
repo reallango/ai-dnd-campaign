@@ -49,6 +49,7 @@ export default function DMDashboard() {
   const [prompt, setPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
   const [aiStatus, setAiStatus] = useState<{ available: boolean; provider: string; error?: string }>({ available: false, provider: '' });
+  const [aiError, setAiError] = useState('');
   
   const [diceInput, setDiceInput] = useState('1d20');
   const [diceLabel, setDiceLabel] = useState('');
@@ -92,7 +93,14 @@ export default function DMDashboard() {
   const handleGenerateNarrative = async () => {
     if (!prompt.trim() || generating) return;
     
+    // Check AI availability first
+    if (!aiStatus.available) {
+      setAiError('AI is not configured. Go to /admin to set up AI connection.');
+      return;
+    }
+    
     setGenerating(true);
+    setAiError('');
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
@@ -113,13 +121,14 @@ export default function DMDashboard() {
           content: data.content,
           created_at: new Date().toISOString()
         }, ...prev]);
+        setPrompt('');
       }
       
       if (data.error) {
-        alert(data.error);
+        setAiError(data.error);
       }
     } catch (err) {
-      console.error('AI error:', err);
+      setAiError(err instanceof Error ? err.message : 'AI generation failed');
     } finally {
       setGenerating(false);
     }
@@ -261,6 +270,7 @@ export default function DMDashboard() {
                   >
                     {generating ? '✨ Generating...' : '✨ Generate Narrative'}
                   </button>
+                  {aiError && <div className="text-crimson text-center mt-sm">{aiError}</div>}
                 </div>
               </div>
             </div>

@@ -9,6 +9,11 @@ services:
     container_name: ai-dnd-campaign
     ports:
       - "3900:3000"
+    volumes:
+      - db_data:/app
     environment:
       - NODE_ENV=production
     restart: always
+
+volumes:
+  db_data:

@@ -1,7 +1,13 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
-const dbPath = path.join(process.cwd(), 'campaign.db');
+const dbDir = process.env.NODE_ENV === 'production' ? '/app/data' : '.';
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const dbPath = path.join(dbDir, 'campaign.db');
 const db = new Database(dbPath);
 
 // Initialize database tables
@@ -91,6 +97,14 @@ db.exec(`
     key TEXT UNIQUE NOT NULL,
     value TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'dm',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
