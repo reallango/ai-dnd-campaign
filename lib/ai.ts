@@ -100,20 +100,7 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
 }
 
 async function callOllama(request: AIRequest, config: AIConfig): Promise<AIResponse> {
-  // Build messages - combine system with first user message for better compatibility
-  const messages = [];
-  
-  if (request.system) {
-    // Combine system and user prompt for models that don't handle system role well
-    messages.push({
-      role: 'user',
-      content: `${request.system}\n\n${request.prompt}`
-    });
-  } else {
-    messages.push({ role: 'user', content: request.prompt });
-  }
-  
-  // Build options - limit context window and control model loading
+  // Use generate endpoint - limit context window and control model loading
   const options: Record<string, number> = {
     temperature: request.temperature ?? 0.7,
     num_predict: Math.min(request.maxTokens ?? 500, 1024),  // Cap output tokens
@@ -136,12 +123,17 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
   const timeoutId = setTimeout(() => controller.abort(), 120000);
   
   try {
-    const response = await fetch(`${config.baseUrl}/api/chat`, {
+    // Use generate endpoint instead of chat
+    const fullPrompt = request.system 
+      ? `${request.system}\n\n${request.prompt}`
+      : request.prompt;
+    
+    const response = await fetch(`${config.baseUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: config.model,
-        messages,
+        prompt: fullPrompt,
         stream: false,
         options: options || {}
       }),
@@ -160,7 +152,7 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
     console.log('Ollama response:', JSON.stringify(data));
     
     return {
-      content: data.message?.content || '',
+      content: data.response || data.message?.content || '',
       model: config.model || 'llama3'
     };
   } catch (error) {
