@@ -1,26 +1,20 @@
 version: '3.8'
 
 services:
-  app:
+  ai-dnd-campaign:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ai-dnd-campaign
+    image: ai-dnd-campaign:latest
     container_name: ai-dnd-campaign
     ports:
       - "3000:3000"
-    volumes:
-      - campaign_data:/app/data
     environment:
-      - AI_PROVIDER=${AI_PROVIDER:-ollama}
-      - AI_BASE_URL=${AI_BASE_URL:-http://host.docker.internal:11434}
-      - AI_MODEL=${AI_MODEL:-llama3}
+      - PORT=3000
+      - HOST=0.0.0.0
+      - AI_PROVIDER=ollama
+      - AI_BASE_URL=http://host.docker.internal:11434
+      - AI_MODEL=llama3
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-volumes:
-  campaign_data:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
