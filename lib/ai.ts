@@ -92,15 +92,25 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
 }
 
 async function callOllama(request: AIRequest, config: AIConfig): Promise<AIResponse> {
+  // Build messages - combine system with first user message for better compatibility
+  const messages = [];
+  
+  if (request.system) {
+    // Combine system and user prompt for models that don't handle system role well
+    messages.push({
+      role: 'user',
+      content: `${request.system}\n\n${request.prompt}`
+    });
+  } else {
+    messages.push({ role: 'user', content: request.prompt });
+  }
+  
   const response = await fetch(`${config.baseUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: config.model,
-      messages: [
-        ...(request.system ? [{ role: 'system', content: request.system }] : []),
-        { role: 'user', content: request.prompt }
-      ],
+      messages,
       stream: false,
       options: {
         temperature: request.temperature ?? 0.7,
