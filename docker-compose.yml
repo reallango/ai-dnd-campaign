@@ -10,10 +10,31 @@ services:
     ports:
       - "3900:3000"
     volumes:
-      - db_data:/app
+      - db_data:/app/data
+      - ollama_data:/root/.ollama
     environment:
       - NODE_ENV=production
+      - AI_PROVIDER=ollama
+      - AI_BASE_URL=http://localhost:11434
+      - AI_MODEL=llama3
     restart: always
+    networks:
+      - ollama_network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-dnd-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: always
+    networks:
+      - ollama_network
+
+networks:
+  ollama_network:
 
 volumes:
   db_data:
+  ollama_data:
