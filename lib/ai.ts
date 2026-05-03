@@ -148,16 +148,20 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Ollama error response:', response.status, errorText);
       throw new Error(`Ollama error: ${response.statusText} - ${errorText}`);
     }
     
     const data = await response.json();
+    console.log('Ollama response:', JSON.stringify(data));
+    
     return {
       content: data.message?.content || '',
       model: config.model || 'llama3'
     };
   } catch (error) {
     clearTimeout(timeoutId);
+    console.error('AI call error:', error);
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('AI took too long - consider reducing maxTokens or using a lighter model');
     }
