@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
       system: systemPrompt,
       maxTokens: Math.min(maxTokens || 500, 512),  // Cap at 512 tokens for speed
       temperature: temperature ?? 0.7,
-      // contextWindow and keepLoaded will come from config (database/env)
     });
     
     console.log('AI response received, length:', response.content?.length || 0);

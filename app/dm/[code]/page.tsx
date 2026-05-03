@@ -107,8 +107,7 @@ export default function DMDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           prompt, 
-          type: 'narrative',
-          context: { campaign: campaign?.name, players: players.map(p => p.name) }
+          type: 'narrative'
         }),
       });
       
