@@ -114,6 +114,8 @@ export default function DMDashboard() {
       
       const data = await response.json();
       
+      console.log('AI response:', response.status, data);
+      
       if (data.content) {
         setNarratives(prev => [{
           id: Date.now(),
@@ -122,10 +124,10 @@ export default function DMDashboard() {
           created_at: new Date().toISOString()
         }, ...prev]);
         setPrompt('');
-      }
-      
-      if (data.error) {
+      } else if (data.error) {
         setAiError(data.error);
+      } else {
+        setAiError('Empty response from AI');
       }
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'AI generation failed');
