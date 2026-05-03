@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Settings {
   ai_provider: string;
   ai_base_url: string;
   ai_model: string;
   ai_api_key: string;
+  ai_adult_content: string;
 }
 
 interface User {
@@ -17,12 +19,15 @@ interface User {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const [settings, setSettings] = useState<Settings>({
     ai_provider: 'ollama',
     ai_base_url: 'http://localhost:11434',
     ai_model: 'llama3',
     ai_api_key: '',
+    ai_adult_content: 'false',
   });
   const [users, setUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'settings' | 'users'>('settings');
@@ -30,56 +35,39 @@ export default function AdminPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // User management
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<'gm' | 'admin'>('gm');
 
   useEffect(() => {
-    setMounted(true);
-    
-    // Check auth
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-      window.location.href = '/login';
-      return;
-    }
-    
-    loadSettings();
-    loadUsers();
+    loadData();
   }, []);
 
-  const loadSettings = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch('/api/admin/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data);
-      }
-    } catch (e) {
-      console.error('Failed to load settings', e);
-    }
-  };
-
-  const loadUsers = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const userStr = localStorage.getItem('user');
-      if (!token || !userStr) return;
+      const [meRes, settingsRes, usersRes] = await Promise.all([
+        fetch('/api/auth/me'),
+        fetch('/api/admin/settings'),
+        fetch('/api/admin/users'),
+      ]);
       
-      const user = JSON.parse(userStr);
-      const res = await fetch('/api/auth/users', {
-        headers: { 
-          'Authorization': token,
-          'x-user-id': user.id.toString()
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users || []);
+      const meData = await meRes.json();
+      const settingsData = await settingsRes.json();
+      const usersData = await usersRes.json();
+      
+      if (!meData.user || meData.user.role !== 'admin') {
+        router.push('/');
+        return;
       }
+      
+      setUser(meData.user);
+      if (settingsData.ai_provider) {
+        setSettings(settingsData);
+      }
+      setUsers(usersData.users || []);
+      setMounted(true);
     } catch (e) {
-      console.error('Failed to load users', e);
+      router.push('/');
     }
   };
 
@@ -141,18 +129,9 @@ export default function AdminPage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('auth_token');
-      const userStr = localStorage.getItem('user');
-      if (!token || !userStr) throw new Error('Not authenticated');
-      
-      const user = JSON.parse(userStr);
       const res = await fetch('/api/auth/users', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token,
-          'x-user-id': user.id.toString()
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole }),
       });
 
@@ -163,7 +142,9 @@ export default function AdminPage() {
 
       setNewUsername('');
       setNewPassword('');
-      loadUsers();
+      const usersRes = await fetch('/api/admin/users');
+      const usersData = await usersRes.json();
+      setUsers(usersData.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
@@ -175,200 +156,183 @@ export default function AdminPage() {
     if (!confirm('Delete this user?')) return;
     
     try {
-      const token = localStorage.getItem('auth_token');
-      const userStr = localStorage.getItem('user');
-      if (!token || !userStr) throw new Error('Not authenticated');
-      
-      const user = JSON.parse(userStr);
-      await fetch(`/api/auth/users?id=${id}`, {
-        method: 'DELETE',
-        headers: { 
-          'Authorization': token,
-          'x-user-id': user.id.toString()
-        }
-      });
-      loadUsers();
+      await fetch(`/api/auth/users?id=${id}`, { method: 'DELETE' });
+      const usersRes = await fetch('/api/admin/users');
+      const usersData = await usersRes.json();
+      setUsers(usersData.users || []);
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/');
   };
 
   if (!mounted) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-md">
-        <div className="loading-spinner" />
-      </main>
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-white">Loading...</div>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-md">
-      <div className="container" style={{ maxWidth: '600px' }}>
-        <div className="text-center mb-lg animate-slide-up">
-          <h1 className="text-gold mb-sm">⚙️ Admin Settings</h1>
-          <p className="text-secondary">Manage AI config & users</p>
+    <div className="min-h-screen bg-slate-900">
+      <header className="bg-slate-800 border-b border-slate-700">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-xl font-bold text-white">⚙️ Admin</h1>
+          <button onClick={handleLogout} className="text-slate-400 hover:text-white">
+            Logout
+          </button>
         </div>
+      </header>
 
-        {/* Tabs */}
-        <div className="flex gap-md mb-md">
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab('settings')}
-            className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-secondary'} flex-1`}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'settings' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             🤖 AI Settings
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`btn ${activeTab === 'users' ? 'btn-primary' : 'btn-secondary'} flex-1`}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             👥 Users
+          </button>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-4 py-2 rounded-lg text-slate-400 hover:text-white"
+          >
+            📜 Campaigns
           </button>
         </div>
 
         {activeTab === 'settings' && (
-          <form onSubmit={saveSettings} className="card animate-slide-up">
-            <div className="card-header">
-              <span className="text-gold">🤖</span> AI Configuration
+          <form onSubmit={saveSettings} className="bg-slate-800 rounded-lg p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white mb-4">AI Configuration</h2>
+            
+            <div>
+              <label className="block text-slate-300 text-sm mb-1">AI Provider</label>
+              <select
+                value={settings.ai_provider}
+                onChange={(e) => setSettings({ ...settings, ai_provider: e.target.value })}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+              >
+                <option value="ollama">Ollama (Local)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="deepseek">DeepSeek</option>
+              </select>
             </div>
 
-            <div className="flex flex-col gap-md">
-              <div>
-                <label className="block text-secondary mb-sm">AI Provider</label>
-                <select
-                  value={settings.ai_provider}
-                  onChange={(e) => setSettings({ ...settings, ai_provider: e.target.value })}
-                  className="w-full"
-                >
-                  <option value="ollama">Ollama (Local)</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-slate-300 text-sm mb-1">Base URL</label>
+              <input
+                type="text"
+                value={settings.ai_base_url}
+                onChange={(e) => setSettings({ ...settings, ai_base_url: e.target.value })}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
 
+            <div>
+              <label className="block text-slate-300 text-sm mb-1">Model</label>
+              <input
+                type="text"
+                value={settings.ai_model}
+                onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+
+            {(settings.ai_provider === 'openai' || settings.ai_provider === 'anthropic' || settings.ai_provider === 'deepseek') && (
               <div>
-                <label className="block text-secondary mb-sm">Base URL</label>
+                <label className="block text-slate-300 text-sm mb-1">API Key</label>
                 <input
-                  type="text"
-                  value={settings.ai_base_url}
-                  onChange={(e) => setSettings({ ...settings, ai_base_url: e.target.value })}
-                  placeholder="http://localhost:11434"
-                  className="w-full"
+                  type="password"
+                  value={settings.ai_api_key}
+                  onChange={(e) => setSettings({ ...settings, ai_api_key: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
                 />
               </div>
+            )}
 
-              <div>
-                <label className="block text-secondary mb-sm">Model</label>
-                <input
-                  type="text"
-                  value={settings.ai_model}
-                  onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
-                  placeholder="llama3"
-                  className="w-full"
-                />
-              </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="adultContent"
+                checked={settings.ai_adult_content === 'true'}
+                onChange={(e) => setSettings({ ...settings, ai_adult_content: e.target.checked ? 'true' : 'false' })}
+                className="w-5 h-5 bg-slate-700 border border-slate-600 rounded"
+              />
+              <label htmlFor="adultContent" className="text-slate-300">
+                Enable adult content (disable AI safety filters)
+              </label>
+            </div>
 
-              {(settings.ai_provider === 'openai' || settings.ai_provider === 'anthropic' || settings.ai_provider === 'deepseek') && (
-                <div>
-                  <label className="block text-secondary mb-sm">API Key</label>
-                  <input
-                    type="password"
-                    value={settings.ai_api_key}
-                    onChange={(e) => setSettings({ ...settings, ai_api_key: e.target.value })}
-                    placeholder="sk-..."
-                    className="w-full"
-                  />
-                </div>
-              )}
+            {error && <div className="text-red-400 text-sm">{error}</div>}
+            {saved && <div className="text-emerald-400 text-sm">Settings saved!</div>}
 
-              {error && <div className="text-crimson text-center">{error}</div>}
-
-              {saved && <div className="text-emerald text-center">Settings saved!</div>}
-
-              <div className="flex gap-md mt-md">
-                <button type="button" onClick={testConnection} disabled={loading} className="btn btn-secondary flex-1">
-                  {loading ? 'Testing...' : 'Test Connection'}
-                </button>
-                <button type="submit" disabled={loading} className="btn btn-primary flex-1">
-                  {loading ? 'Saving...' : 'Save Settings'}
-                </button>
-              </div>
+            <div className="flex gap-2 mt-4">
+              <button type="button" onClick={testConnection} disabled={loading} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
+                {loading ? 'Testing...' : 'Test Connection'}
+              </button>
+              <button type="submit" disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                {loading ? 'Saving...' : 'Save Settings'}
+              </button>
             </div>
           </form>
         )}
 
         {activeTab === 'users' && (
-          <div className="card animate-slide-up">
-            <div className="card-header">
-              <span className="text-gold">👥</span> User Management
+          <div className="bg-slate-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">User Management</h2>
+            
+            <div className="flex gap-2 mb-6 p-4 bg-slate-700/50 rounded-lg">
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="Username"
+                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+              />
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Password"
+                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+              />
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'gm' | 'admin')} className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                <option value="gm">GM</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button onClick={addUser} disabled={loading || !newUsername || !newPassword} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                Add User
+              </button>
             </div>
 
-            {/* Add user form */}
-            <div className="flex flex-col gap-sm mb-lg" style={{ padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-              <h3 className="text-gold">Add New User</h3>
-              <div className="flex gap-sm">
-                <input
-                  type="text"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  placeholder="Username"
-                  className="flex-1"
-                />
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Password"
-                  className="flex-1"
-                />
-              </div>
-              <div className="flex gap-sm">
-                <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'gm' | 'admin')} className="flex-1">
-                  <option value="gm">GM</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <button onClick={addUser} disabled={loading || !newUsername || !newPassword} className="btn btn-primary">
-                  Add User
-                </button>
-              </div>
-            </div>
-
-            {/* User list */}
-            <div className="flex flex-col gap-sm">
+            <div className="space-y-2">
               {users.map(user => (
-                <div key={user.id} className="flex items-center justify-between" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                <div key={user.id} className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
                   <div>
-                    <span className="text-gold">{user.username}</span>
-                    <span className="text-muted" style={{ marginLeft: '0.5rem' }}>({user.role})</span>
+                    <span className="text-white">{user.username}</span>
+                    <span className="text-slate-400 ml-2">({user.role})</span>
                   </div>
-                  <button onClick={() => deleteUser(user.id)} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }}>
+                  <button onClick={() => deleteUser(user.id)} className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40">
                     Delete
                   </button>
                 </div>
               ))}
-              {users.length === 0 && <p className="text-muted">No users yet</p>}
+              {users.length === 0 && <p className="text-slate-500">No users yet</p>}
             </div>
           </div>
         )}
-
-        <div className="flex gap-md mt-lg">
-          <button onClick={handleLogout} className="btn btn-secondary flex-1">
-            Logout
-          </button>
-        </div>
-
-        <footer className="footer">
-          <p className="text-muted">
-            <a href="/" className="text-gold">← Back to Home</a>
-          </p>
-        </footer>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
