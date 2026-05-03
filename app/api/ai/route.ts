@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       // contextWindow and keepLoaded will come from config (database/env)
     });
     
+    console.log('AI response received, length:', response.content?.length || 0);
+    
     return NextResponse.json({ 
       content: response.content,
       model: response.model
