@@ -1,20 +1,16 @@
-FROM node:20-alpine
-
+# Stage 1: Build
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Copy and install dependencies
-COPY package*.json ./
-RUN npm ci --legacy-peer-deps
-
-# Copy app files
+COPY package*.json package-lock.json ./
+RUN npm ci
 COPY . .
+RUN npm run build
 
-# Build the app - fail if this fails
-RUN npm run build || { echo "BUILD FAILED"; exit 1; }
-
-# Expose port
+# Stage 2: Production runner
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app ./
+COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
-
-# Run production
 ENV NODE_ENV=production
-CMD ["npm", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
