@@ -22,6 +22,9 @@ export default function LoginPage() {
     try {
       const res = await fetch('/api/auth/check');
       const data = await res.json();
+      if (data.needsSetup) {
+        router.push('/setup');
+      }
       setIsFirstTime(data.needsSetup);
     } catch (e) {
       console.error(e);
