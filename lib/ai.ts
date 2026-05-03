@@ -7,6 +7,8 @@ export interface AIConfig {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  contextWindow?: number;
+  keepLoaded?: number;
 }
 
 export interface AIRequest {
@@ -14,6 +16,8 @@ export interface AIRequest {
   system?: string;
   maxTokens?: number;
   temperature?: number;
+  contextWindow?: number;  // context window size
+  keepLoaded?: number;   // how long to keep model loaded (seconds, -1 = forever)
 }
 
 export interface AIResponse {
@@ -41,6 +45,8 @@ function getConfig(): AIConfig {
         apiKey: settings.ai_api_key || undefined,
         baseUrl: settings.ai_base_url || 'http://localhost:11434',
         model: settings.ai_model || getDefaultModel(settings.ai_provider),
+        contextWindow: parseInt(settings.ai_context_window) || 4096,
+        keepLoaded: parseInt(settings.ai_keep_loaded) || 300,
       };
     }
   } catch (e) {
@@ -55,6 +61,8 @@ function getConfig(): AIConfig {
     apiKey: process.env.AI_API_KEY,
     baseUrl: process.env.AI_BASE_URL || 'http://localhost:11434',
     model: process.env.AI_MODEL || getDefaultModel(provider),
+    contextWindow: parseInt(process.env.AI_CONTEXT_WINDOW || '') || 4096,
+    keepLoaded: parseInt(process.env.AI_KEEP_LOADED || '') || 300,
   };
 }
 
@@ -105,29 +113,56 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
     messages.push({ role: 'user', content: request.prompt });
   }
   
-  const response = await fetch(`${config.baseUrl}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      stream: false,
-      options: {
-        temperature: request.temperature ?? 0.7,
-        num_predict: request.maxTokens ?? 500,
-      }
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Ollama error: ${response.statusText}`);
-  }
-  
-  const data = await response.json();
-  return {
-    content: data.message?.content || '',
-    model: config.model || 'llama3'
+  // Build options - limit context window and control model loading
+  const options: Record<string, number> = {
+    temperature: request.temperature ?? 0.7,
+    num_predict: Math.min(request.maxTokens ?? 500, 1024),  // Cap output tokens
   };
+  
+  // Set context window (use config if not in request)
+  const ctxWindow = request.contextWindow || config.contextWindow || 4096;
+  options.num_ctx = ctxWindow;
+  
+  // Keep model loaded (use config if not in request)
+  const keepLoaded = request.keepLoaded ?? config.keepLoaded ?? 300;
+  options.keep_alive = keepLoaded;
+  
+  const controller = new AbortController();
+  // 2 minute timeout for first prompt (model needs to load)
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+  
+  try {
+    const response = await fetch(`${config.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: config.model,
+        messages,
+        stream: false,
+        options
+      }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ollama error: ${response.statusText} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    return {
+      content: data.message?.content || '',
+      model: config.model || 'llama3'
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('AI took too long - consider reducing maxTokens or using a lighter model');
+    }
+    throw error;
+  }
 }
 
 async function callOpenAI(request: AIRequest, config: AIConfig): Promise<AIResponse> {

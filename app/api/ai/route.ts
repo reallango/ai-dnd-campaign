@@ -22,8 +22,9 @@ export async function POST(request: NextRequest) {
     const response = await callAI({
       prompt,
       system: systemPrompt,
-      maxTokens: maxTokens || 1000,
-      temperature: temperature ?? 0.7
+      maxTokens: Math.min(maxTokens || 500, 512),  // Cap at 512 tokens for speed
+      temperature: temperature ?? 0.7,
+      // contextWindow and keepLoaded will come from config (database/env)
     });
     
     return NextResponse.json({ 
