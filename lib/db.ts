@@ -1,0 +1,154 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+
+const dbPath = path.join(process.cwd(), 'campaign.db');
+const db = new Database(dbPath);
+
+// Initialize database tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    dm_name TEXT,
+    status TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL,
+    character_id INTEGER,
+    name TEXT NOT NULL,
+    is_connected INTEGER DEFAULT 0,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS characters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER,
+    name TEXT NOT NULL,
+    race TEXT,
+    class TEXT,
+    level INTEGER DEFAULT 1,
+    background TEXT,
+    stats TEXT,
+    inventory TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (player_id) REFERENCES players(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL,
+    mode TEXT DEFAULT 'live',
+    status TEXT DEFAULT 'waiting',
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at DATETIME,
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS narrative_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    metadata TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS choices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    narrative_log_id INTEGER NOT NULL,
+    player_id INTEGER,
+    choice_text TEXT NOT NULL,
+    selected INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (narrative_log_id) REFERENCES narrative_logs(id),
+    FOREIGN KEY (player_id) REFERENCES players(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS dice_rolls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL,
+    player_id INTEGER,
+    dice TEXT NOT NULL,
+    result INTEGER NOT NULL,
+    breakdown TEXT,
+    label TEXT,
+    is_anonymous INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+  );
+`);
+
+export default db;
+
+export interface Campaign {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  dm_name?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Player {
+  id: number;
+  campaign_id: number;
+  character_id?: number;
+  name: string;
+  is_connected: number;
+  joined_at: string;
+}
+
+export interface Character {
+  id: number;
+  player_id?: number;
+  name: string;
+  race?: string;
+  class?: string;
+  level: number;
+  background?: string;
+  stats?: string;
+  inventory?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface Session {
+  id: number;
+  campaign_id: number;
+  mode: string;
+  status: string;
+  started_at: string;
+  ended_at?: string;
+}
+
+export interface NarrativeLog {
+  id: number;
+  session_id: number;
+  type: string;
+  content: string;
+  metadata?: string;
+  created_at: string;
+}
+
+export interface DiceRoll {
+  id: number;
+  campaign_id: number;
+  player_id?: number;
+  dice: string;
+  result: number;
+  breakdown?: string;
+  label?: string;
+  is_anonymous: number;
+  created_at: string;
+}
