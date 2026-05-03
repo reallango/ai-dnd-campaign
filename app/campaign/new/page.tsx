@@ -7,6 +7,8 @@ export default function NewCampaignPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [gameSystem, setGameSystem] = useState('dnd5e');
+  const [isShared, setIsShared] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,7 +33,7 @@ export default function NewCampaignPage() {
       const response = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, game_system: gameSystem, is_shared: isShared }),
       });
 
       const data = await response.json();
@@ -87,6 +89,34 @@ export default function NewCampaignPage() {
               placeholder="Optional description"
               rows={3}
             />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 text-sm mb-1">Game System</label>
+            <select
+              value={gameSystem}
+              onChange={(e) => setGameSystem(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-purple-500 focus:outline-none"
+            >
+              <option value="dnd5e">D&D 5th Edition</option>
+              <option value="pathfinder2e">Pathfinder 2nd Edition</option>
+              <option value="callofcthulhu">Call of Cthulhu</option>
+              <option value="savageworlds">Savage Worlds</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="isShared"
+              checked={isShared}
+              onChange={(e) => setIsShared(e.target.checked)}
+              className="w-5 h-5 bg-slate-800 border border-slate-600 rounded"
+            />
+            <label htmlFor="isShared" className="text-slate-300">
+              Share with other GMs (make this campaign visible to other registered Game Masters)
+            </label>
           </div>
 
           {error && (

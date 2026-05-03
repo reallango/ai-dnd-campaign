@@ -33,7 +33,7 @@ export default function AdminPage() {
   // User management
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newRole, setNewRole] = useState<'dm' | 'admin'>('dm');
+  const [newRole, setNewRole] = useState<'gm' | 'admin'>('gm');
 
   useEffect(() => {
     setMounted(true);
@@ -329,8 +329,8 @@ export default function AdminPage() {
                 />
               </div>
               <div className="flex gap-sm">
-                <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'dm' | 'admin')} className="flex-1">
-                  <option value="dm">DM</option>
+                <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'gm' | 'admin')} className="flex-1">
+                  <option value="gm">GM</option>
                   <option value="admin">Admin</option>
                 </select>
                 <button onClick={addUser} disabled={loading || !newUsername || !newPassword} className="btn btn-primary">

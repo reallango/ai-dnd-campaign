@@ -14,13 +14,16 @@ const db = new Database(dbPath);
 db.exec(`
   CREATE TABLE IF NOT EXISTS campaigns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL,
     code TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
-    dm_name TEXT,
+    game_system TEXT DEFAULT 'dnd5e',
+    is_shared INTEGER DEFAULT 0,
     status TEXT DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS players (

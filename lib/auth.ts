@@ -5,7 +5,7 @@ import crypto from 'crypto';
 export interface User {
   id: number;
   username: string;
-  role: 'admin' | 'dm';
+  role: 'admin' | 'gm';
   created_at: string;
 }
 
@@ -62,7 +62,7 @@ export function getAllUsers(): User[] {
 }
 
 // Create user (admin only)
-export function createUser(username: string, password: string, role: 'admin' | 'dm'): { success: boolean; error?: string } {
+export function createUser(username: string, password: string, role: 'admin' | 'gm'): { success: boolean; error?: string } {
   try {
     const hash = hashPassword(password);
     db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)').run(username, hash, role);
