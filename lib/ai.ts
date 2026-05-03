@@ -92,57 +92,32 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
 }
 
 async function callOllama(request: AIRequest, config: AIConfig): Promise<AIResponse> {
-  // Build messages - some models work better with system as first user message
-  const messages = [];
+  const response = await fetch(`${config.baseUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        ...(request.system ? [{ role: 'system', content: request.system }] : []),
+        { role: 'user', content: request.prompt }
+      ],
+      stream: false,
+      options: {
+        temperature: request.temperature ?? 0.7,
+        num_predict: request.maxTokens ?? 500,
+      }
+    })
+  });
   
-  if (request.system) {
-    // Add system as a user message with instruction
-    messages.push({
-      role: 'user',
-      content: `${request.system}\n\n${request.prompt}`
-    });
-  } else {
-    messages.push({ role: 'user', content: request.prompt });
+  if (!response.ok) {
+    throw new Error(`Ollama error: ${response.statusText}`);
   }
   
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-  
-  try {
-    const response = await fetch(`${config.baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: config.model,
-        messages,
-        stream: false,
-        options: {
-          temperature: request.temperature ?? 0.7,
-          num_predict: request.maxTokens ?? 1000,
-        }
-      }),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Ollama error ${response.status}: ${errorText}`);
-    }
-    
-    const data = await response.json();
-    return {
-      content: data.message?.content || '',
-      model: config.model || 'llama3'
-    };
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Connection timeout - check your AI server URL');
-    }
-    throw error;
-  }
+  const data = await response.json();
+  return {
+    content: data.message?.content || '',
+    model: config.model || 'llama3'
+  };
 }
 
 async function callOpenAI(request: AIRequest, config: AIConfig): Promise<AIResponse> {
