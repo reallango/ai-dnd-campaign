@@ -92,25 +92,36 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
 }
 
 async function callOllama(request: AIRequest, config: AIConfig): Promise<AIResponse> {
+  // Build messages - some models work better with system as first user message
+  const messages = [];
+  
+  if (request.system) {
+    // Add system as a user message with instruction
+    messages.push({
+      role: 'user',
+      content: `${request.system}\n\n${request.prompt}`
+    });
+  } else {
+    messages.push({ role: 'user', content: request.prompt });
+  }
+  
   const response = await fetch(`${config.baseUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: config.model,
-      messages: [
-        ...(request.system ? [{ role: 'system', content: request.system }] : []),
-        { role: 'user', content: request.prompt }
-      ],
+      messages,
       stream: false,
       options: {
         temperature: request.temperature ?? 0.7,
-        num_predict: request.maxTokens ?? 500,
+        num_predict: request.maxTokens ?? 1000,
       }
     })
   });
   
   if (!response.ok) {
-    throw new Error(`Ollama error: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Ollama error ${response.status}: ${errorText}`);
   }
   
   const data = await response.json();
