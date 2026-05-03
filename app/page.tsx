@@ -5,239 +5,177 @@ import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const router = useRouter();
-  const [mode, setMode] = useState<'choice' | 'create' | 'join'>('choice');
   const [mounted, setMounted] = useState(false);
-  const [campaignName, setCampaignName] = useState('');
-  const [dmName, setDmName] = useState('');
+  const [mode, setMode] = useState<'login' | 'join'>('login');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [campaignCode, setCampaignCode] = useState('');
-  const [playerName, setPlayerName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Ensure client-side hydration
   useEffect(() => {
     setMounted(true);
+    checkAuth();
   }, []);
 
-  const handleCreateCampaign = async (e: React.FormEvent) => {
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          router.push('/dashboard');
+        }
+      }
+    } catch (e) {
+      // Not logged in, stay on page
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
-      const response = await fetch('/api/campaigns', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: campaignName, dm_name: dmName }),
+        body: JSON.stringify({ username, password }),
       });
-      
+
       const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create campaign');
+
+      if (response.ok && data.success) {
+        router.push('/dashboard');
+      } else {
+        setError(data.error || 'Login failed');
       }
-      
-      router.push(`/dm/${data.campaign.code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (e) {
+      setError('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleJoinCampaign = async (e: React.FormEvent) => {
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    
-    try {
-      // First verify campaign exists
-      const response = await fetch(`/api/campaigns/${campaignCode.toUpperCase()}`);
-      
-      if (!response.ok) {
-        throw new Error('Campaign not found');
-      }
-      
-      const data = await response.json();
-      router.push(`/player/${data.campaign.code}?name=${encodeURIComponent(playerName)}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Campaign not found');
-    } finally {
-      setLoading(false);
+    if (!campaignCode.trim()) {
+      setError('Please enter a campaign code');
+      return;
     }
+    router.push(`/player/${campaignCode.trim().toUpperCase()}`);
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-md">
-      <div className="container">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+      <div className="w-full max-w-md">
         {/* Logo/Title */}
-        <div className="text-center mb-lg animate-slide-up">
-          <div className="ornament justify-center mb-md">
-            <span>Campaigned</span>
-          </div>
-          <h1 className="text-gold mb-sm">AI D&D Campaign Manager</h1>
-          <p className="text-secondary">
-            Run immersive AI-assisted tabletop adventures for 1-10 players
-          </p>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">⚔️ AI D&D</h1>
+          <p className="text-purple-300">Dungeon Master Assistant</p>
         </div>
 
-        {/* Choice Cards - show on mount */}
-        {mode === 'choice' && mounted && (
-          <div className="grid grid-2 gap-lg max-w-3xl mx-auto">
-            <button
-              onClick={() => setMode('create')}
-              className="card card-create animate-slide-up stagger-1"
-              style={{ cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div className="card-header">
-                <span className="text-gold">⚔️</span> Create Campaign
-              </div>
-              <p className="text-secondary">
-                Start a new adventure as the Dungeon Master. Create a campaign and invite players to join.
-              </p>
-              <div className="mt-md text-gold">Begin New Campaign →</div>
-            </button>
-            
-            <button
-              onClick={() => setMode('join')}
-              className="card card-join animate-slide-up stagger-2"
-              style={{ cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div className="card-header">
-                <span className="text-gold">🛡️</span> Join Campaign
-              </div>
-              <p className="text-secondary">
-                Enter a campaign code to join an existing adventure as a player.
-              </p>
-              <div className="mt-md text-gold">Enter Campaign →</div>
-            </button>
+        {/* Mode Tabs */}
+        <div className="flex mb-6 bg-slate-800/50 rounded-lg p-1">
+          <button
+            onClick={() => { setMode('login'); setError(''); }}
+            className={`flex-1 py-2 px-4 rounded-md transition ${
+              mode === 'login' 
+                ? 'bg-purple-600 text-white' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Login
+          </button>
+          <button
+            onClick={() => { setMode('join'); setError(''); }}
+            className={`flex-1 py-2 px-4 rounded-md transition ${
+              mode === 'join' 
+                ? 'bg-purple-600 text-white' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Join Campaign
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm">
+            {error}
           </div>
         )}
 
-        {/* Create Campaign Form */}
-        {mode === 'create' && (
-          <div className="card animate-slide-up" style={{ maxWidth: '450px', margin: '0 auto' }}>
-            <div className="card-header">
-              <span className="text-gold">⚔️</span> Create New Campaign
+        {mode === 'login' ? (
+          /* Login Form */
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-slate-300 text-sm mb-1">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                placeholder="Enter username"
+                required
+              />
             </div>
-            
-            <form onSubmit={handleCreateCampaign}>
-              <div className="flex flex-col gap-md">
-                <div>
-                  <label className="block text-secondary mb-sm">Campaign Name *</label>
-                  <input
-                    type="text"
-                    value={campaignName}
-                    onChange={(e) => setCampaignName(e.target.value)}
-                    placeholder="The Lost Mines of Phandelver"
-                    className="w-full"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-secondary mb-sm">Your Name (DM)</label>
-                  <input
-                    type="text"
-                    value={dmName}
-                    onChange={(e) => setDmName(e.target.value)}
-                    placeholder="Dungeon Master"
-                    className="w-full"
-                  />
-                </div>
-                
-                {error && (
-                  <div className="text-crimson text-center">{error}</div>
-                )}
-                
-                <div className="flex gap-md mt-md">
-                  <button
-                    type="button"
-                    onClick={() => setMode('choice')}
-                    className="btn btn-secondary flex-1"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn btn-primary flex-1"
-                  >
-                    {loading ? 'Creating...' : 'Create Campaign'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Join Campaign Form */}
-        {mode === 'join' && (
-          <div className="card animate-slide-up" style={{ maxWidth: '450px', margin: '0 auto' }}>
-            <div className="card-header">
-              <span className="text-gold">🛡️</span> Join Campaign
+            <div>
+              <label className="block text-slate-300 text-sm mb-1">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                placeholder="Enter password"
+                required
+              />
             </div>
-            
-            <form onSubmit={handleJoinCampaign}>
-              <div className="flex flex-col gap-md">
-                <div>
-                  <label className="block text-secondary mb-sm">Campaign Code *</label>
-                  <input
-                    type="text"
-                    value={campaignCode}
-                    onChange={(e) => setCampaignCode(e.target.value.toUpperCase())}
-                    placeholder="ABC123"
-                    maxLength={6}
-                    className="w-full text-center"
-                    style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', letterSpacing: '0.2em' }}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-secondary mb-sm">Your Character Name</label>
-                  <input
-                    type="text"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    placeholder="Grom the Brave"
-                    className="w-full"
-                    required
-                  />
-                </div>
-                
-                {error && (
-                  <div className="text-crimson text-center">{error}</div>
-                )}
-                
-                <div className="flex gap-md mt-md">
-                  <button
-                    type="button"
-                    onClick={() => setMode('choice')}
-                    className="btn btn-secondary flex-1"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn btn-primary flex-1"
-                  >
-                    {loading ? 'Joining...' : 'Join Campaign'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition disabled:opacity-50"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        ) : (
+          /* Join Campaign */
+          <form onSubmit={handleJoin} className="space-y-4">
+            <div>
+              <label className="block text-slate-300 text-sm mb-1">Campaign Code</label>
+              <input
+                type="text"
+                value={campaignCode}
+                onChange={(e) => setCampaignCode(e.target.value.toUpperCase())}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none text-center text-2xl tracking-widest font-mono"
+                placeholder="Enter code"
+                maxLength={6}
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition"
+            >
+              Join Campaign
+            </button>
+          </form>
         )}
 
         {/* Footer */}
-        <footer className="footer">
-          <p className="text-muted">
-            AI D&D Campaign Manager • Self-hosted • Free and Open Source
-          </p>
-        </footer>
+        <div className="mt-8 text-center text-slate-500 text-sm">
+          AI-powered storytelling for your D&D adventures
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
