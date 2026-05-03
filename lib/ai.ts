@@ -9,6 +9,7 @@ export interface AIConfig {
   model?: string;
   contextWindow?: number;
   keepLoaded?: number;
+  adultContent?: boolean;
 }
 
 export interface AIRequest {
@@ -47,6 +48,7 @@ function getConfig(): AIConfig {
         model: settings.ai_model || getDefaultModel(settings.ai_provider),
         contextWindow: parseInt(settings.ai_context_window) || 4096,
         keepLoaded: parseInt(settings.ai_keep_loaded) || 300,
+        adultContent: settings.ai_adult_content === 'true',
       };
     }
   } catch (e) {
@@ -63,6 +65,7 @@ function getConfig(): AIConfig {
     model: process.env.AI_MODEL || getDefaultModel(provider),
     contextWindow: parseInt(process.env.AI_CONTEXT_WINDOW || '') || 4096,
     keepLoaded: parseInt(process.env.AI_KEEP_LOADED || '') || 300,
+    adultContent: process.env.AI_ADULT_CONTENT === 'true',
   };
 }
 
@@ -105,6 +108,11 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
     temperature: request.temperature ?? 0.7,
     num_predict: Math.min(request.maxTokens ?? 500, 1024),  // Cap output tokens
   };
+
+  // Check if adult content is allowed - if not, add safety instruction
+  const safetyInstruction = config.adultContent 
+    ? '' 
+    : '\n\nIMPORTANT: Keep all content appropriate for all ages. Avoid violence, horror, or mature themes.';
   
   // Set context window (use config if not in request)
   const ctxWindow = request.contextWindow || config.contextWindow || 4096;
@@ -125,8 +133,8 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
   try {
     // Use generate endpoint instead of chat
     const fullPrompt = request.system 
-      ? `${request.system}\n\n${request.prompt}`
-      : request.prompt;
+      ? `${request.system}\n\n${request.prompt}${safetyInstruction}`
+      : request.prompt + safetyInstruction;
     
     const response = await fetch(`${config.baseUrl}/api/generate`, {
       method: 'POST',
