@@ -1,34 +1,21 @@
-# AI D&D Campaign Manager - Dockerfile
+# AI D&D Campaign Manager - Production Dockerfile
 
-# Build: docker build -t ai-dnd-campaign .
-# Run: docker run -p 3000:3000 -v ./campaign.db:/app/campaign.db ai-dnd-campaign
-
-# Use Node.js 20 LTS
 FROM node:20-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install dependencies first (for caching)
 COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
-
-# Copy application files
+# Copy app files
 COPY . .
 
-# Expose the port
+# Build the app
+RUN npm run build
+
+# Expose port
 EXPOSE 3000
 
-# Environment variables for AI (optional)
-# AI_PROVIDER=ollama
-# AI_BASE_URL=http://host.docker.internal:11434
-# AI_MODEL=llama3
-
-# For cloud AI:
-# AI_PROVIDER=openai
-# AI_API_KEY=your-key-here
-
-# Start the application
-CMD ["npm", "run", "dev"]
+# Run production
+CMD ["npm", "start"]
