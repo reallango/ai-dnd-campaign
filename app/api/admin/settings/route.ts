@@ -68,11 +68,11 @@ export async function POST(request: NextRequest) {
 
     // Save SMTP settings
     console.log('Saving SMTP settings:', body.smtp_host, body.smtp_user, body.smtp_from, body.smtp_tls);
-    if (body.smtp_host !== undefined) upsert.run('smtp_host', body.smtp_host);
-    if (body.smtp_port !== undefined) upsert.run('smtp_port', body.smtp_port);
-    if (body.smtp_user !== undefined) upsert.run('smtp_user', body.smtp_user);
-    if (body.smtp_pass !== undefined) upsert.run('smtp_pass', body.smtp_pass);
-    if (body.smtp_from !== undefined) upsert.run('smtp_from', body.smtp_from);
+    if (body.smtp_host !== undefined) upsert.run('smtp_host', body.smtp_host.trim());
+    if (body.smtp_port !== undefined) upsert.run('smtp_port', body.smtp_port.trim());
+    if (body.smtp_user !== undefined) upsert.run('smtp_user', body.smtp_user.trim());
+    if (body.smtp_pass !== undefined) upsert.run('smtp_pass', body.smtp_pass.trim());
+    if (body.smtp_from !== undefined) upsert.run('smtp_from', body.smtp_from.trim());
     if (body.smtp_tls !== undefined) upsert.run('smtp_tls', body.smtp_tls ? 'true' : 'false');
 
     return NextResponse.json({ success: true });

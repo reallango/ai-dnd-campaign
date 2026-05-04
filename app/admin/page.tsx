@@ -178,13 +178,7 @@ export default function AdminPage() {
     setError('');
 
     try {
-      // First save settings if not saved
-      await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(smtpSettings),
-      });
-      
+      // Note: User must save settings first before testing
       const res = await fetch('/api/admin/test-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
