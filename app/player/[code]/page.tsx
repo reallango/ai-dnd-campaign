@@ -152,6 +152,15 @@ export default function PlayerPortal() {
       console.error('Dice error:', err);
     }
   };
+  
+  // Roll 4d6 drop lowest
+  const handleRollAbility = (stat: string) => {
+    const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1);
+    rolls.sort((a, b) => b - a);
+    const best3 = rolls.slice(0, 3);
+    const total = best3.reduce((a, b) => a + b, 0);
+    setAbilityScores(prev => ({ ...prev, [stat]: total }));
+  };
 
   if (!campaign) {
     return (
@@ -309,7 +318,313 @@ export default function PlayerPortal() {
           </div>
         )}
 
-        {/* Playing - Player View */}
+        {/* Character Wizard - Guided/Manual */}
+        {step === 'create-wizard' && (
+          <div className="card animate-slide-up" style={{ maxWidth: '700px', margin: '0 auto' }}>
+            <div className="card-header">
+              <span className="text-gold">📝</span> Create Your Character - Step {wizardStep} of 5
+            </div>
+            
+            {/* Step 1: Basics */}
+            {wizardStep === 1 && (
+              <div className="flex flex-col gap-md">
+                <div>
+                  <label className="block text-secondary mb-sm">Character Name *</label>
+                  <input
+                    type="text"
+                    value={characterName}
+                    onChange={(e) => setCharacterName(e.target.value)}
+                    placeholder="Grom the Brave"
+                    className="w-full"
+                    required
+                  />
+                </div>
+                
+                <div className="grid grid-2 gap-md">
+                  <div>
+                    <label className="block text-secondary mb-sm">Race</label>
+                    <select
+                      value={characterRace}
+                      onChange={(e) => setCharacterRace(e.target.value)}
+                      className="w-full"
+                    >
+                      <option value="">Any race...</option>
+                      <option value="Human">Human</option>
+                      <option value="Elf">Elf</option>
+                      <option value="Dwarf">Dwarf</option>
+                      <option value="Halfling">Halfling</option>
+                      <option value="Dragonborn">Dragonborn</option>
+                      <option value="Gnome">Gnome</option>
+                      <option value="Half-Elf">Half-Elf</option>
+                      <option value="Half-Orc">Half-Orc</option>
+                      <option value="Tiefling">Tiefling</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-secondary mb-sm">Class</label>
+                    <select
+                      value={characterClass}
+                      onChange={(e) => setCharacterClass(e.target.value)}
+                      className="w-full"
+                    >
+                      <option value="">Any class...</option>
+                      <option value="Fighter">Fighter</option>
+                      <option value="Wizard">Wizard</option>
+                      <option value="Rogue">Rogue</option>
+                      <option value="Cleric">Cleric</option>
+                      <option value="Paladin">Paladin</option>
+                      <option value="Ranger">Ranger</option>
+                      <option value="Bard">Bard</option>
+                      <option value="Barbarian">Barbarian</option>
+                      <option value="Druid">Druid</option>
+                      <option value="Monk">Monk</option>
+                      <option value="Sorcerer">Sorcerer</option>
+                      <option value="Warlock">Warlock</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-secondary mb-sm">Background</label>
+                  <select
+                    value={characterBackground}
+                    onChange={(e) => setCharacterBackground(e.target.value)}
+                    className="w-full"
+                  >
+                    <option value="">Any background...</option>
+                    <option value="Acolyte">Acolyte</option>
+                    <option value="Criminal">Criminal</option>
+                    <option value="Sage">Sage</option>
+                    <option value="Soldier">Soldier</option>
+                    <option value="Urchin">Urchin</option>
+                    <option value="Noble">Noble</option>
+                    <option value="Entertainer">Entertainer</option>
+                    <option value="Folk Hero">Folk Hero</option>
+                  </select>
+                </div>
+              </div>
+            )}
+            
+            {/* Step 2: Ability Scores */}
+            {wizardStep === 2 && (
+              <div className="flex flex-col gap-md">
+                <p className="text-secondary">Roll your ability scores (4d6 drop lowest) or use standard array.</p>
+                
+                <div className="grid grid-3 gap-md">
+                  {(['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const).map((stat) => (
+                    <div key={stat} className="text-center">
+                      <div className="text-muted text-sm">{stat}</div>
+                      <div className="text-2xl text-gold font-display">{abilityScores[stat]}</div>
+                      <div className="text-muted text-sm">{(abilityScores[stat] >= 10) ? `+${Math.floor((abilityScores[stat] - 10) / 2)}` : Math.floor((abilityScores[stat] - 10) / 2)}</div>
+                      <div className="flex gap-sm mt-xs justify-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRollAbility(stat)}
+                          className="btn btn-secondary text-sm"
+                        >
+                          Roll
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setAbilityScores({ STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 })}
+                  className="btn btn-secondary"
+                >
+                  Use Standard Array (15, 14, 13, 12, 10, 8)
+                </button>
+              </div>
+            )}
+            
+            {/* Step 3: Personality */}
+            {wizardStep === 3 && (
+              <div className="flex flex-col gap-md">
+                <div>
+                  <label className="block text-secondary mb-sm">Personality Traits (what makes you unique)</label>
+                  <textarea
+                    value={personalityTraits}
+                    onChange={(e) => setPersonalityTraits(e.target.value)}
+                    placeholder="I'm always calm, no matter what's happening..."
+                    className="w-full"
+                    rows={2}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-secondary mb-sm">Ideals (what drives you)</label>
+                  <textarea
+                    value={ideals}
+                    onChange={(e) => setIdeals(e.target.value)}
+                    placeholder="The innocent must be protected..."
+                    className="w-full"
+                    rows={2}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-secondary mb-sm">Bonds (what connects you to the world)</label>
+                  <textarea
+                    value={bonds}
+                    onChange={(e) => setBonds(e.target.value)}
+                    placeholder="My family is my everything..."
+                    className="w-full"
+                    rows={2}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-secondary mb-sm">Flaws (your weaknesses)</label>
+                  <textarea
+                    value={flaws}
+                    onChange={(e) => setFlaws(e.target.value)}
+                    placeholder="I trust no one..."
+                    className="w-full"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Step 4: Backstory */}
+            {wizardStep === 4 && (
+              <div className="flex flex-col gap-md">
+                <div>
+                  <label className="block text-secondary mb-sm">Backstory (2-3 sentences)</label>
+                  <textarea
+                    value={backstory}
+                    onChange={(e) => setBackstory(e.target.value)}
+                    placeholder="I grew up in a small village and always dreamed of adventure..."
+                    className="w-full"
+                    rows={5}
+                  />
+                </div>
+                
+                {createMode === 'guided' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setGenerating(true);
+                      try {
+                        const res = await fetch('/api/character-generate', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            mode: 'guided',
+                            preferences: { race: characterRace, class: characterClass, backstory }
+                          })
+                        });
+                        const data = await res.json();
+                        if (data.character) {
+                          setGeneratedCharacter(data.character);
+                          setWizardStep(5);
+                        }
+                      } catch (e) {
+                        setError('Failed to generate');
+                      } finally {
+                        setGenerating(false);
+                      }
+                    }}
+                    disabled={generating}
+                    className="btn btn-secondary"
+                  >
+                    {generating ? 'Generating...' : '✨ Fill rest with AI'}
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {/* Step 5: Review */}
+            {wizardStep === 5 && (
+              <div className="flex flex-col gap-md">
+                <h4 className="text-gold">Review Your Character</h4>
+                
+                <div className="grid grid-2 gap-md text-sm">
+                  <div><span className="text-muted">Name:</span> {characterName}</div>
+                  <div><span className="text-muted">Race:</span> {characterRace || 'Human'}</div>
+                  <div><span className="text-muted">Class:</span> {characterClass || 'Fighter'}</div>
+                  <div><span className="text-muted">Background:</span> {characterBackground || 'Soldier'}</div>
+                </div>
+                
+                <div className="divider" />
+                
+                <h5 className="text-muted">Ability Scores</h5>
+                <div className="grid grid-3 gap-sm text-center">
+                  {Object.entries(abilityScores).map(([stat, score]) => (
+                    <div key={stat}>
+                      <span className="text-muted">{stat}:</span> <span className="text-gold">{score}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                {(personalityTraits || backstory) && (
+                  <>
+                    <div className="divider" />
+                    {personalityTraits && <div><span className="text-muted">Personality:</span> {personalityTraits}</div>}
+                    {backstory && <div><span className="text-muted">Backstory:</span> {backstory}</div>}
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* Navigation */}
+            <div className="flex gap-md mt-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  if (wizardStep > 1) setWizardStep(wizardStep - 1);
+                  else setStep('create-mode');
+                }}
+                className="btn btn-secondary flex-1"
+              >
+                Back
+              </button>
+              
+              {createMode === 'manual' && wizardStep < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(wizardStep + 1)}
+                  className="btn btn-primary flex-1"
+                >
+                  Next
+                </button>
+              )}
+              
+              {wizardStep === 5 && (
+                <button
+                  type="button"
+                  onClick={() => setStep('create-review')}
+                  className="btn btn-primary flex-1"
+                >
+                  Continue
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Character Review */}
+        {step === 'create-review' && (
+          <div className="card animate-slide-up" style={{ maxWidth: '700px', margin: '0 auto' }}>
+            <div className="card-header">
+              <span className="text-gold">✓</span> Character Ready
+            </div>
+            
+            <div className="flex flex-col gap-md">
+              <p className="text-secondary">Your character is ready to play!</p>
+              
+              <button
+                onClick={() => setStep('playing')}
+                className="btn btn-primary w-full"
+              >
+                Enter the Game
+              </button>
+            </div>
+          </div>
+        )}
         {step === 'playing' && (
           <div className="grid gap-lg" style={{ gridTemplateColumns: '1fr 300px' }}>
             {/* Main Narrative Area */}
