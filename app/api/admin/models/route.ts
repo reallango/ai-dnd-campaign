@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/admin/models - check currently loaded models (Ollama)
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get base URL from environment
-    const ai_base_url = process.env.AI_BASE_URL || 'http://localhost:11434';
+    // Get base URL from query params or use default
+    const { searchParams } = new URL(request.url);
+    const ai_base_url = searchParams.get('base_url') || process.env.AI_BASE_URL || 'http://localhost:11434';
     
     try {
       const res = await fetch(`${ai_base_url}/api/ps`, {
@@ -27,18 +28,18 @@ export async function GET() {
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { model } = body;
+    const { model, ai_base_url } = body;
     
     if (!model) {
       return NextResponse.json({ error: 'Model name required' }, { status: 400 });
     }
     
-    // Get base URL from environment
-    const ai_base_url = process.env.AI_BASE_URL || 'http://localhost:11434';
+    // Get base URL from body or use default
+    const baseUrl = ai_base_url || process.env.AI_BASE_URL || 'http://localhost:11434';
     
     try {
       // Use /api/generate with keep_alive: 0 to unload the model
-      const res = await fetch(`${ai_base_url}/api/generate`, {
+      const res = await fetch(`${baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

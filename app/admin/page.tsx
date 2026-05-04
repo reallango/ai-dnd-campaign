@@ -133,9 +133,11 @@ export default function AdminPage() {
     setCheckingLoaded(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/models', {
+      // Pass base_url as query parameter
+      const url = new URL('/api/admin/models', window.location.href);
+      url.searchParams.set('base_url', settings.ai_base_url);
+      const res = await fetch(url.toString(), {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json();
       if (data.loaded_models) {
@@ -156,7 +158,7 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/models', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: modelName }),
+        body: JSON.stringify({ model: modelName, ai_base_url: settings.ai_base_url }),
       });
       const data = await res.json();
       if (data.success) {
