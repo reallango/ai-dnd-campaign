@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { APP_VERSION, APP_BRANCH } from '@/lib/version';
 
 interface Settings {
   ai_provider: string;
@@ -1008,9 +1009,9 @@ export default function AdminPage() {
             {/* Version info */}
             <div className="mb-6 p-4 bg-slate-700 rounded-lg">
               <div className="text-slate-400 text-sm mb-1">Current Version</div>
-              <div className="text-white text-lg font-mono">{versionInfo.currentVersion || '1.0.0'}</div>
+              <div className="text-white text-lg font-mono">{versionInfo.currentVersion || APP_VERSION}</div>
               <div className="text-slate-400 text-sm mt-2">Branch</div>
-              <div className="text-white font-mono">{versionInfo.currentBranch || 'main'}</div>
+              <div className="text-white font-mono">{versionInfo.currentBranch || APP_BRANCH}</div>
             </div>
 
             {/* Check for updates */}
