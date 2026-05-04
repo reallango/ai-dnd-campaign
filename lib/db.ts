@@ -17,6 +17,17 @@ export function initDb() {
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   
+  // Run migrations for new columns
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN email TEXT`);
+  } catch (e) { /* column may already exist */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN password_reset_token TEXT`);
+  } catch (e) { /* column may already exist */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN password_reset_expires DATETIME`);
+  } catch (e) { /* column may already exist */ }
+  
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
