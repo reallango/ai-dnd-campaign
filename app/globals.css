@@ -133,6 +133,8 @@ body {
 .gap-sm { gap: 0.5rem; }
 .gap-md { gap: 1rem; }
 .gap-lg { gap: 1.5rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
 
 .w-full { width: 100%; }
 .h-full { height: 100%; }

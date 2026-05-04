@@ -160,8 +160,10 @@ export default function PlayerPortal() {
                 )}
               </p>
             </div>
-            <div className="badge badge-gold">
-              Player View
+            <div className="flex items-center gap-2">
+              <button onClick={() => router.push('/')} className="btn btn-secondary text-sm">
+                ← Home
+              </button>
             </div>
           </div>
         </div>

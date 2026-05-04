@@ -39,7 +39,7 @@ export default function NewCampaignPage() {
       const data = await response.json();
 
       if (response.ok && data.campaign) {
-        router.push(`/dm/${data.campaign.code}`);
+        router.push(`/storyteller/${data.campaign.code}`);
       } else {
         setError(data.error || 'Failed to create campaign');
       }

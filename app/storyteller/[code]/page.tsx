@@ -187,6 +187,9 @@ export default function DMDashboard() {
               <div className={`w-2 h-2 rounded-full ${aiStatus.available ? 'bg-success' : 'bg-error'}`} />
               <span className="text-muted text-sm">{aiStatus.provider || 'AI'}</span>
             </div>
+            <button onClick={() => router.push('/dashboard')} className="btn btn-secondary text-sm">
+              ← Dashboard
+            </button>
           </div>
         </div>
       </header>
@@ -197,7 +200,7 @@ export default function DMDashboard() {
           className={`tab ${activeTab === 'narrative' ? 'active' : ''}`}
           onClick={() => setActiveTab('narrative')}
         >
-          🗡️ Narrative
+          📝 Storyteller
         </button>
         <button 
           className={`tab ${activeTab === 'combat' ? 'active' : ''}`}
@@ -394,6 +397,39 @@ export default function DMDashboard() {
               />
               <p className="text-muted text-sm mt-sm">
                 Enter a URL to an image to display as the current map.
+              </p>
+            </div>
+            
+            <div className="card">
+              <div className="card-header">🔒 Campaign Sharing</div>
+              <div className="flex items-center gap-md">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={campaign?.is_shared === 1}
+                    onChange={async (e) => {
+                      if (!campaign) return;
+                      try {
+                        const res = await fetch(`/api/campaigns/${campaign.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ is_shared: e.target.checked }),
+                        });
+                        const data = await res.json();
+                        if (data.campaign) {
+                          setCampaign(data.campaign);
+                        }
+                      } catch (err) {
+                        console.error('Failed to update sharing');
+                      }
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <span>Share with other Storytellers</span>
+                </label>
+              </div>
+              <p className="text-muted text-sm mt-sm">
+                When enabled, other Game Masters can view and run this campaign.
               </p>
             </div>
             

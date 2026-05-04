@@ -106,10 +106,10 @@ export default function CampaignsPage() {
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => router.push(`/dm/${campaign.code}`)}
+                    onClick={() => router.push(`/storyteller/${campaign.code}`)}
                     className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded"
                   >
-                    Open DM
+                    Open
                   </button>
                   <button
                     onClick={() => router.push(`/player/${campaign.code}`)}

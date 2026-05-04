@@ -9,6 +9,9 @@ interface Settings {
   ai_model: string;
   ai_api_key: string;
   ai_adult_content: string;
+  ai_context_window: string;
+  ai_timeout: string;
+  models?: string[];
 }
 
 interface User {
@@ -28,7 +31,11 @@ export default function AdminPage() {
     ai_model: 'llama3',
     ai_api_key: '',
     ai_adult_content: 'false',
+    ai_context_window: '4096',
+    ai_timeout: '120',
   });
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'settings' | 'users'>('settings');
   const [loading, setLoading] = useState(false);
@@ -95,6 +102,26 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchModels = async () => {
+    setFetchingModels(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json();
+      if (data.models) {
+        setAvailableModels(data.models);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch models');
+    } finally {
+      setFetchingModels(false);
     }
   };
 
@@ -241,12 +268,63 @@ export default function AdminPage() {
 
             <div>
               <label className="block text-slate-300 text-sm mb-1">Model</label>
-              <input
-                type="text"
-                value={settings.ai_model}
-                onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={settings.ai_model}
+                  onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
+                  className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  placeholder="llama3"
+                />
+                <button 
+                  type="button" 
+                  onClick={fetchModels}
+                  disabled={fetchingModels || !settings.ai_base_url}
+                  className="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm rounded whitespace-nowrap"
+                >
+                  {fetchingModels ? 'Loading...' : 'Get Models'}
+                </button>
+              </div>
+              {availableModels.length > 0 && (
+                <select
+                  value={settings.ai_model }
+                  onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
+                  className="mt-2 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                >
+                  <option value="">Select model...</option>
+                  {availableModels.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-300 text-sm mb-1">Context Window (tokens)</label>
+                <select
+                  value={settings.ai_context_window}
+                  onChange={(e) => setSettings({ ...settings, ai_context_window: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                >
+                  <option value="2048">2K</option>
+                  <option value="4096">4K</option>
+                  <option value="8192">8K</option>
+                  <option value="16384">16K</option>
+                  <option value="32768">32K</option>
+                  <option value="65536">64K</option>
+                  <option value="128000">128K</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-300 text-sm mb-1">Timeout (seconds)</label>
+                <input
+                  type="number"
+                  value={settings.ai_timeout}
+                  onChange={(e) => setSettings({ ...settings, ai_timeout: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                />
+              </div>
             </div>
 
             {(settings.ai_provider === 'openai' || settings.ai_provider === 'anthropic' || settings.ai_provider === 'deepseek') && (
@@ -292,26 +370,26 @@ export default function AdminPage() {
           <div className="bg-slate-800 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-white mb-4">User Management</h2>
             
-            <div className="flex gap-2 mb-6 p-4 bg-slate-700/50 rounded-lg">
+            <div className="flex gap-2 mb-6 p-4 bg-slate-700/50 rounded-lg items-center">
               <input
                 type="text"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
                 placeholder="Username"
-                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
               />
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Password"
-                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
               />
-              <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'gm' | 'admin')} className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'gm' | 'admin')} className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
                 <option value="gm">GM</option>
                 <option value="admin">Admin</option>
               </select>
-              <button onClick={addUser} disabled={loading || !newUsername || !newPassword} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+              <button onClick={addUser} disabled={loading || !newUsername || !newPassword} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 whitespace-nowrap">
                 Add User
               </button>
             </div>
