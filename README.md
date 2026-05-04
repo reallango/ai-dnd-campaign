@@ -1,36 +1,41 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and configure:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | SQLite path (e.g., `./data/ai-dnd.db`) | Yes |
+| `AI_PROVIDER` | `ollama`, `openai`, `anthropic`, `deepseek` | Yes |
+| `AI_BASE_URL` | AI API endpoint | Yes |
+| `AI_MODEL` | AI model name | Yes |
+| `AI_TIMEOUT` | AI timeout in seconds (default: 120) | No |
+| `GITHUB_TOKEN` | GitHub token for feedback issues | No |
+| `SESSION_SECRET` | Secret for session cookies | Yes |
+
+### GitHub Token (for feedback system)
+
+Generate at: **GitHub → Settings → Developer settings → Personal access tokens**
+
+Required scope:
+- `repo` - Full private repo access
+- OR `public_repo` - Public repos only
+
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+cp .env.example .env.local
+# Edit .env.local with your values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When deploying, add environment variables in the Vercel dashboard:
+- Project → Settings → Environment Variables
+- Add each variable from `.env.example`
