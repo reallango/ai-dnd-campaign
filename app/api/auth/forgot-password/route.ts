@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, generatePasswordResetToken } from '@/lib/auth';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, getEmailSettings } from '@/lib/email';
 
 // POST /api/auth/forgot-password - Request password reset
 export async function POST(request: NextRequest) {
@@ -10,6 +10,14 @@ export async function POST(request: NextRequest) {
     
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
+    
+    // Check if SMTP is configured
+    const emailSettings = getEmailSettings();
+    if (!emailSettings || !emailSettings.smtp_host || !emailSettings.smtp_user) {
+      return NextResponse.json({ 
+        error: 'Password reset is not enabled. Please contact the site administrator to enable this feature.' 
+      }, { status: 503 });
     }
     
     // Always return success to prevent email enumeration
