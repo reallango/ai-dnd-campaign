@@ -35,6 +35,7 @@ export async function GET() {
       smtp_host: settings.smtp_host || '',
       smtp_port: settings.smtp_port || '587',
       smtp_user: settings.smtp_user || '',
+      smtp_pass: settings.smtp_pass || '',
       smtp_from: settings.smtp_from || '',
       smtp_tls: settings.smtp_tls !== 'false',
     });
