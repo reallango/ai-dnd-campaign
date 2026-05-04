@@ -64,3 +64,59 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create character' }, { status: 500 });
   }
 }
+
+// PUT /api/characters - Update character
+export async function PUT(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Character ID required' }, { status: 400 });
+    }
+    
+    const body = await request.json();
+    const { name, race, class: charClass, level, background, stats, inventory, notes } = body;
+    
+    db.prepare(`
+      UPDATE characters SET name = ?, race = ?, class = ?, level = ?, background = ?, stats = ?, inventory = ?, notes = ?
+      WHERE id = ?
+    `).run(
+      name,
+      race || '',
+      charClass || '',
+      level || 1,
+      background || '',
+      stats ? JSON.stringify(stats) : null,
+      inventory || '',
+      notes || '',
+      id
+    );
+    
+    const character = db.prepare('SELECT * FROM characters WHERE id = ?').get(id);
+    
+    return NextResponse.json({ character });
+  } catch (error) {
+    console.error('Error updating character:', error);
+    return NextResponse.json({ error: 'Failed to update character' }, { status: 500 });
+  }
+}
+
+// DELETE /api/characters - Delete character
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Character ID required' }, { status: 400 });
+    }
+    
+    db.prepare('DELETE FROM characters WHERE id = ?').run(id);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting character:', error);
+    return NextResponse.json({ error: 'Failed to delete character' }, { status: 500 });
+  }
+}

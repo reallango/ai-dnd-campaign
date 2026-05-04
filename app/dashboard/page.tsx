@@ -118,6 +118,16 @@ export default function Dashboard() {
             <div className="text-white font-semibold">My Campaigns</div>
             <div className="text-slate-400 text-sm">View & manage campaigns</div>
           </button>
+          
+          {/* Character Manager */}
+          <button
+            onClick={() => router.push('/characters')}
+            className="p-6 bg-slate-800 hover:bg-slate-700 rounded-lg text-left transition"
+          >
+            <div className="text-3xl mb-2">🛡️</div>
+            <div className="text-white font-semibold">Characters</div>
+            <div className="text-slate-400 text-sm">Create & manage characters</div>
+          </button>
 
           {/* Admin (only for admin) */}
           {user?.role === 'admin' && (
