@@ -65,6 +65,10 @@ export default function AdminPage() {
   const [editRole, setEditRole] = useState<'gm' | 'admin'>('gm');
   const [editPassword, setEditPassword] = useState('');
   
+  // Email tab state
+  const [testEmail, setTestEmail] = useState('');
+  const [testEmailStatus, setTestEmailStatus] = useState('');
+  
   // SMTP settings state
   const [smtpSettings, setSmtpSettings] = useState({
     smtp_host: '',
@@ -162,6 +166,39 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testEmailSettings = async () => {
+    if (!testEmail) {
+      setTestEmailStatus('Please enter an email address');
+      return;
+    }
+    setTestEmailStatus('Sending...');
+    setError('');
+
+    try {
+      // First save settings if not saved
+      await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(smtpSettings),
+      });
+      
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: testEmail }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestEmailStatus('Test email sent successfully!');
+      } else {
+        setTestEmailStatus(data.error || 'Failed to send test email');
+      }
+    } catch (err) {
+      setTestEmailStatus(err instanceof Error ? err.message : 'Failed to send test email');
     }
   };
 
@@ -871,6 +908,28 @@ export default function AdminPage() {
               <button type="submit" disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                 {loading ? 'Saving...' : 'Save Email Settings'}
               </button>
+              
+              <div className="mt-6 pt-6 border-t border-slate-600">
+                <h3 className="text-white font-semibold mb-3">Test Email Settings</h3>
+                <p className="text-slate-400 text-sm mb-3">Send a test email to verify your SMTP settings are correct.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder="test@example.com"
+                    className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  />
+                  <button onClick={testEmailSettings} disabled={loading} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                    Send Test
+                  </button>
+                </div>
+                {testEmailStatus && (
+                  <div className={`mt-2 text-sm ${testEmailStatus.includes('success') ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {testEmailStatus}
+                  </div>
+                )}
+              </div>
             </form>
           </div>
         )}
