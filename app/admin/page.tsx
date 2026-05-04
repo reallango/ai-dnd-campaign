@@ -58,6 +58,13 @@ export default function AdminPage() {
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'gm' | 'admin'>('gm');
   
+  // Edit user state
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<'gm' | 'admin'>('gm');
+  const [editPassword, setEditPassword] = useState('');
+  
   // SMTP settings state
   const [smtpSettings, setSmtpSettings] = useState({
     smtp_host: '',
@@ -248,8 +255,7 @@ export default function AdminPage() {
     }
   };
 
-  const addUser = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const addUser = async () => {
     setLoading(true);
     setError('');
 
@@ -273,6 +279,40 @@ export default function AdminPage() {
       setUsers(usersData.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateUser = async () => {
+    if (!editingUser) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch(`/api/auth/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: editUsername, 
+          email: editEmail, 
+          role: editRole,
+          password: editPassword || undefined 
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update user');
+      }
+
+      setEditingUser(null);
+      setEditPassword('');
+      const usersRes = await fetch('/api/admin/users');
+      const usersData = await usersRes.json();
+      setUsers(usersData.users || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update user');
     } finally {
       setLoading(false);
     }
@@ -614,13 +654,76 @@ export default function AdminPage() {
                     {user.email && <span className="text-slate-400 ml-2">({user.email})</span>}
                     <span className="text-slate-400 ml-2">({user.role})</span>
                   </div>
-                  <button onClick={() => deleteUser(user.id)} className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40">
-                    Delete
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setEditingUser(user); setEditUsername(user.username); setEditEmail(user.email || ''); setEditRole(user.role as 'gm' | 'admin'); }} className="px-3 py-1 bg-purple-600/20 text-purple-400 rounded hover:bg-purple-600/40">
+                      Edit
+                    </button>
+                    <button onClick={() => deleteUser(user.id)} className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40">
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
               {users.length === 0 && <p className="text-slate-500">No users yet</p>}
             </div>
+            
+            {/* Edit User Modal */}
+            {editingUser && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md">
+                  <h3 className="text-lg font-semibold text-white mb-4">Edit User: {editingUser.username}</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-slate-300 text-sm mb-1">Username</label>
+                      <input
+                        type="text"
+                        value={editUsername}
+                        onChange={(e) => setEditUsername(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 text-sm mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 text-sm mb-1">Role</label>
+                      <select value={editRole} onChange={(e) => setEditRole(e.target.value as 'gm' | 'admin')} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <option value="gm">GM</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 text-sm mb-1">New Password (leave blank to keep current)</label>
+                      <input
+                        type="password"
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                      />
+                    </div>
+                  </div>
+                  
+                  {error && <div className="text-red-400 text-sm mt-2">{error}</div>}
+                  
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => setEditingUser(null)} className="flex-1 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500">
+                      Cancel
+                    </button>
+                    <button onClick={updateUser} disabled={loading} className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                      {loading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

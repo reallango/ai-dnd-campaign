@@ -90,6 +90,11 @@ export function isAdmin(userId: number): boolean {
   return user?.role === 'admin';
 }
 
+// Get user by ID
+export function getUser(userId: number): User | null {
+  return db.prepare('SELECT id, username, email, role, created_at FROM users WHERE id = ?').get(userId) as User | null;
+}
+
 // Get user from API token or session cookie
 export async function getUserFromRequest(request: NextRequest): Promise<{ id: number; username: string; role: string } | null> {
   // Check header first
