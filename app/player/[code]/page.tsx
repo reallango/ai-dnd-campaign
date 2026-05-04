@@ -32,7 +32,27 @@ export default function PlayerPortal() {
   const code = params.code as string;
   const playerName = searchParams.get('name') || '';
   
-  const [step, setStep] = useState<'character-select' | 'character-create' | 'playing'>('character-select');
+  const [step, setStep] = useState<'character-select' | 'create-mode' | 'create-wizard' | 'create-review' | 'playing'>('character-select');
+  const [createMode, setCreateMode] = useState<'random' | 'guided' | 'manual'>('manual');
+  const [wizardStep, setWizardStep] = useState(1);
+  
+  // Character data
+  const [characterName, setCharacterName] = useState('');
+  const [characterRace, setCharacterRace] = useState('');
+  const [characterClass, setCharacterClass] = useState('');
+  const [characterBackground, setCharacterBackground] = useState('');
+  const [abilityScores, setAbilityScores] = useState({ STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 });
+  const [skills, setSkills] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const [personalityTraits, setPersonalityTraits] = useState('');
+  const [ideals, setIdeals] = useState('');
+  const [bonds, setBonds] = useState('');
+  const [flaws, setFlaws] = useState('');
+  const [backstory, setBackstory] = useState('');
+  
+  // AI generation
+  const [generating, setGenerating] = useState(false);
+  const [generatedCharacter, setGeneratedCharacter] = useState<any>(null);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [savedCharacters, setSavedCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
@@ -46,11 +66,6 @@ export default function PlayerPortal() {
   const [diceLabel, setDiceLabel] = useState('');
   const [diceResult, setDiceResult] = useState<{ dice: string; result: number; breakdown: string } | null>(null);
   const [showDiceResult, setShowDiceResult] = useState(false);
-  
-  const [characterName, setCharacterName] = useState('');
-  const [characterRace, setCharacterRace] = useState('');
-  const [characterClass, setCharacterClass] = useState('');
-  const [characterBackground, setCharacterBackground] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -205,7 +220,7 @@ export default function PlayerPortal() {
               <div className="divider" />
               
               <button
-                onClick={() => setStep('character-create')}
+                onClick={() => setStep('create-mode')}
                 className="btn btn-secondary w-full"
               >
                 Create New Character
@@ -214,103 +229,83 @@ export default function PlayerPortal() {
           </div>
         )}
 
-        {/* Character Creation */}
-        {step === 'character-create' && (
+        {/* Character Creation - Mode Selection */}
+        {step === 'create-mode' && (
           <div className="card animate-slide-up" style={{ maxWidth: '600px', margin: '0 auto' }}>
             <div className="card-header">
               <span className="text-gold">✨</span> Create New Character
             </div>
-            
-            <form onSubmit={handleCreateCharacter}>
-              <div className="flex flex-col gap-md">
-                <div>
-                  <label className="block text-secondary mb-sm">Character Name *</label>
-                  <input
-                    type="text"
-                    value={characterName}
-                    onChange={(e) => setCharacterName(e.target.value)}
-                    placeholder="Grom the Brave"
-                    className="w-full"
-                    required
-                  />
+            <div className="flex flex-col gap-md">
+              <p className="text-secondary mb-md">
+                Choose how you want to create your character:
+              </p>
+              
+              {/* Random AI */}
+              <button
+                onClick={async () => {
+                  setCreateMode('random');
+                  setGenerating(true);
+                  try {
+                    const res = await fetch('/api/character-generate', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mode: 'random' })
+                    });
+                    const data = await res.json();
+                    if (data.character) {
+                      setGeneratedCharacter(data.character);
+                      setStep('create-review');
+                    }
+                  } catch (e) {
+                    setError('Failed to generate character');
+                  } finally {
+                    setGenerating(false);
+                  }
+                }}
+                disabled={generating}
+                className="choice-option text-left"
+              >
+                <div className="text-gold text-lg">🎲 Random Generation</div>
+                <div className="text-muted text-sm">
+                  Let AI create a completely random character for you
                 </div>
-                
-                <div className="grid grid-2 gap-md">
-                  <div>
-                    <label className="block text-secondary mb-sm">Race</label>
-                    <select
-                      value={characterRace}
-                      onChange={(e) => setCharacterRace(e.target.value)}
-                      className="w-full"
-                    >
-                      <option value="">Select race...</option>
-                      <option value="Human">Human</option>
-                      <option value="Elf">Elf</option>
-                      <option value="Dwarf">Dwarf</option>
-                      <option value="Halfling">Halfling</option>
-                      <option value="Dragonborn">Dragonborn</option>
-                      <option value="Gnome">Gnome</option>
-                      <option value="Half-Elf">Half-Elf</option>
-                      <option value="Half-Orc">Half-Orc</option>
-                      <option value="Tiefling">Tiefling</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-secondary mb-sm">Class</label>
-                    <select
-                      value={characterClass}
-                      onChange={(e) => setCharacterClass(e.target.value)}
-                      className="w-full"
-                    >
-                      <option value="">Select class...</option>
-                      <option value="Fighter">Fighter</option>
-                      <option value="Wizard">Wizard</option>
-                      <option value="Rogue">Rogue</option>
-                      <option value="Cleric">Cleric</option>
-                      <option value="Paladin">Paladin</option>
-                      <option value="Ranger">Ranger</option>
-                      <option value="Bard">Bard</option>
-                      <option value="Barbarian">Barbarian</option>
-                      <option value="Druid">Druid</option>
-                      <option value="Monk">Monk</option>
-                      <option value="Sorcerer">Sorcerer</option>
-                      <option value="Warlock">Warlock</option>
-                    </select>
-                  </div>
+              </button>
+              
+              {/* Guided AI */}
+              <button
+                onClick={() => {
+                  setCreateMode('guided');
+                  setStep('create-wizard');
+                }}
+                className="choice-option text-left"
+              >
+                <div className="text-gold text-lg">🧙 Guided Generation</div>
+                <div className="text-muted text-sm">
+                  Answer a few questions, AI fills in the rest
                 </div>
-                
-                <div>
-                  <label className="block text-secondary mb-sm">Background</label>
-                  <textarea
-                    value={characterBackground}
-                    onChange={(e) => setCharacterBackground(e.target.value)}
-                    placeholder="Acolyte, Criminal, Sage, Soldier..."
-                    className="w-full"
-                    rows={3}
-                  />
+              </button>
+              
+              {/* Manual */}
+              <button
+                onClick={() => {
+                  setCreateMode('manual');
+                  setStep('create-wizard');
+                }}
+                className="choice-option text-left"
+              >
+                <div className="text-gold text-lg">✏️ Manual Creation</div>
+                <div className="text-muted text-sm">
+                  Fill out the character sheet yourself (use built-in dice roller)
                 </div>
-                
-                {error && <div className="text-crimson">{error}</div>}
-                
-                <div className="flex gap-md">
-                  <button
-                    type="button"
-                    onClick={() => setStep('character-select')}
-                    className="btn btn-secondary flex-1"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn btn-primary flex-1"
-                  >
-                    {loading ? 'Creating...' : 'Create Character'}
-                  </button>
-                </div>
-              </div>
-            </form>
+              </button>
+              
+              <button
+                onClick={() => setStep('character-select')}
+                className="btn btn-secondary w-full mt-md"
+              >
+                Back
+              </button>
+            </div>
           </div>
         )}
 
