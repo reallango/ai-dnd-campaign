@@ -74,7 +74,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
     const transporter = nodemailer.createTransport({
       host: smtp_host,
       port: parseInt(smtp_port) || 587,
-      secure: smtp_tls,
+      secure: false, // Use STARTTLS for port 587
+      requireTLS: smtp_tls,
       auth: {
         user: smtp_user,
         pass: smtp_pass,
