@@ -107,6 +107,17 @@ export default function AdminPage() {
       if (settingsData.ai_provider) {
         setSettings(settingsData);
       }
+      // Load SMTP settings
+      if (settingsData.smtp_host) {
+        setSmtpSettings({
+          smtp_host: settingsData.smtp_host || '',
+          smtp_port: settingsData.smtp_port || '587',
+          smtp_user: settingsData.smtp_user || '',
+          smtp_pass: settingsData.smtp_pass || '',
+          smtp_from: settingsData.smtp_from || '',
+          smtp_tls: settingsData.smtp_tls !== false,
+        });
+      }
       setUsers(usersData.users || []);
       setApiTokens(tokensData.tokens || []);
       setMounted(true);
