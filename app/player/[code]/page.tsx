@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 
 interface Campaign {
   id: number;
@@ -28,6 +28,7 @@ interface NarrativeEntry {
 export default function PlayerPortal() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const code = params.code as string;
   const playerName = searchParams.get('name') || '';
   

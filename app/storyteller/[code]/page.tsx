@@ -9,6 +9,7 @@ interface Campaign {
   name: string;
   description: string;
   dm_name: string;
+  is_shared?: number;
 }
 
 interface Player {

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAIConfig } from '@/lib/ai';
 
 // POST /api/admin/models - fetch available models from AI provider
 export async function POST(request: NextRequest) {
   try {
-    const config = await getAIConfig();
     const body = await request.json();
     const { ai_provider, ai_base_url, ai_api_key } = body;
     
