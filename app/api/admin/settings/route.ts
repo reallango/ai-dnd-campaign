@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     if (body.ai_timeout !== undefined) upsert.run('ai_timeout', body.ai_timeout.toString());
 
     // Save SMTP settings
+    console.log('Saving SMTP settings:', body.smtp_host, body.smtp_user, body.smtp_from, body.smtp_tls);
     if (body.smtp_host !== undefined) upsert.run('smtp_host', body.smtp_host);
     if (body.smtp_port !== undefined) upsert.run('smtp_port', body.smtp_port);
     if (body.smtp_user !== undefined) upsert.run('smtp_user', body.smtp_user);

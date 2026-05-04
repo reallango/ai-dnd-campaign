@@ -17,6 +17,7 @@ export function getEmailSettings(): EmailConfig | null {
       WHERE key LIKE 'smtp_%'
     `).all() as { key: string; value: string }[];
     
+    console.log('getEmailSettings DB rows:', rows);
     if (rows.length === 0) return null;
     
     const settings: Record<string, string> = {} as Record<string, string>;
