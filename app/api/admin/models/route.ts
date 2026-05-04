@@ -38,22 +38,25 @@ export async function DELETE(request: NextRequest) {
     const baseUrl = ai_base_url || process.env.AI_BASE_URL || 'http://localhost:11434';
     
     try {
-      // Use /api/generate with keep_alive: 0 to unload the model
+      // Use /api/generate with keep_alive: 0 at TOP LEVEL (not in options!)
       const res = await fetch(`${baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: model,
-          prompt: '',
-          options: { keep_alive: 0 }
+          prompt: '',  // empty prompt to unload
+          keep_alive: 0  // TOP LEVEL - this is the key!
         }),
       });
+      
+      const data = await res.json();
+      console.log('Unload response:', data);
       
       if (!res.ok) {
         return NextResponse.json({ error: 'Failed to unload model' }, { status: 400 });
       }
       
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, done_reason: data.done_reason });
     } catch (e) {
       return NextResponse.json({ error: 'Failed to connect to Ollama' }, { status: 400 });
     }

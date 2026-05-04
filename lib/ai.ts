@@ -124,12 +124,9 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
   options.num_ctx = ctxWindow;
   console.log('num_ctx setting:', ctxWindow);
   
-  // Keep model loaded (use config if not in request)
+  // Keep model loaded (use config if not in request) - AT TOP LEVEL not in options!
   const keepLoaded = request.keepLoaded ?? config.keepLoaded ?? 300;
-  options.keep_alive = keepLoaded;
   console.log('keep_alive setting:', keepLoaded, 'config.keepLoaded:', config.keepLoaded);
-  
-  console.log('Final options:', JSON.stringify(options));
   
   const controller = new AbortController();
   // Use configured timeout (defaults to 120 seconds)
@@ -149,7 +146,12 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
         model: config.model,
         prompt: fullPrompt,
         stream: false,
-        options: options || {}
+        keep_alive: keepLoaded,  // TOP LEVEL - this is the key!
+        options: {
+          temperature: options.temperature,
+          num_predict: options.num_predict,
+          num_ctx: options.num_ctx
+        }
       }),
       signal: controller.signal
     });

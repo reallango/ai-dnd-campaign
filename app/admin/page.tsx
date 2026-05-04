@@ -408,14 +408,18 @@ export default function AdminPage() {
             {loadedModels.length > 0 && (
               <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
                 <h4 className="text-white font-medium mb-2">Currently Loaded Models</h4>
-                <p className="text-slate-400 text-sm mb-2">Note: Ollama automatically unloads models after the keep_alive time. These models are currently in memory but will be unloaded automatically.</p>
+                <p className="text-slate-400 text-sm mb-2">Click Unload to immediately remove a model from memory.</p>
                 <div className="space-y-2">
                   {loadedModels.map(model => (
                     <div key={model} className="flex justify-between items-center">
                       <span className="text-slate-300">{model}</span>
-                      <span className="px-3 py-1 bg-yellow-600/20 text-yellow-400 rounded text-sm">
-                        Auto-unload
-                      </span>
+                      <button 
+                        type="button"
+                        onClick={() => unloadModel(model)}
+                        className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40 text-sm"
+                      >
+                        Unload
+                      </button>
                     </div>
                   ))}
                 </div>
