@@ -62,15 +62,20 @@ export default function DMDashboard() {
   // Load initial data
   const loadCampaignData = useCallback(async () => {
     try {
-      const [campaignRes, playersRes, diceRes, aiRes] = await Promise.all([
-        fetch(`https://gm-assist.intisive.com/api/campaigns/${code}`),
-        fetch(`https://gm-assist.intisive.com/api/players?campaignId=`),
-        fetch(`https://gm-assist.intisive.com/api/dice?campaignId=&limit=20`),
-        fetch(`https://gm-assist.intisive.com/api/ai`),
-      ]);
-      
+      // First get campaign to get its numeric ID
+      const campaignRes = await fetch(`https://gm-assist.intisive.com/api/campaigns/${code}`);
       const campaignData = await campaignRes.json();
-      if (campaignData.campaign) setCampaign(campaignData.campaign);
+      if (!campaignData.campaign) return;
+      setCampaign(campaignData.campaign);
+      const campaignId = campaignData.campaign.id;
+      
+      // Then fetch other data
+      const [playersRes, diceRes, aiRes, narrativesRes] = await Promise.all([
+        fetch(`https://gm-assist.intisive.com/api/players?campaignId=${campaignId}`),
+        fetch(`https://gm-assist.intisive.com/api/dice?campaignId=${campaignId}&limit=20`),
+        fetch(`https://gm-assist.intisive.com/api/ai`),
+        fetch(`https://gm-assist.intisive.com/api/narratives/${campaignId}`),
+      ]);
       
       const playersData = await playersRes.json();
       if (playersData.players) setPlayers(playersData.players);
@@ -80,6 +85,9 @@ export default function DMDashboard() {
       
       const aiData = await aiRes.json();
       setAiStatus(aiData);
+      
+      const narrativesData = await narrativesRes.json();
+      if (narrativesData.narratives) setNarratives(narrativesData.narratives);
     } catch (err) {
       console.error('Error loading campaign:', err);
     }
@@ -117,12 +125,24 @@ export default function DMDashboard() {
       console.log('AI response:', response.status, data);
       
       if (data.content) {
-        setNarratives(prev => [{
-          id: Date.now(),
-          type: 'ai',
-          content: data.content,
-          created_at: new Date().toISOString()
-        }, ...prev]);
+        // Save to database
+        try {
+          const saveRes = await fetch(`https://gm-assist.intisive.com/api/narratives/${campaign?.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'ai',
+              content: data.content,
+              metadata: { prompt }
+            }),
+          });
+          const saved = await saveRes.json();
+          if (saved.narrative) {
+            setNarratives(prev => [saved.narrative, ...prev]);
+          }
+        } catch (saveErr) {
+          console.error('Error saving narrative:', saveErr);
+        }
         setPrompt('');
       } else if (data.error) {
         setAiError(data.error);
