@@ -10,6 +10,7 @@ export default function SetupPage() {
   
   // Admin fields
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
@@ -51,7 +52,7 @@ export default function SetupPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, isFirstTime: true }),
+        body: JSON.stringify({ username, password, email, isFirstTime: true }),
       });
 
       const data = await res.json();
@@ -159,6 +160,16 @@ export default function SetupPage() {
                   placeholder="admin"
                   className="w-full"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-secondary mb-sm">Email (optional)</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="w-full"
                 />
               </div>
               <div>

@@ -7,11 +7,13 @@ let db: Database.Database | null = null;
 export function initDb() {
   if (db) return db;
   
-  const dbDir = '/app/data';
+  const dbDir = process.env.DATABASE_PATH || '/app/data';
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
-  const dbPath = path.join(dbDir, 'campaign.db');
+  const dbPath = process.env.DATABASE_PATH 
+    ? process.env.DATABASE_PATH 
+    : path.join(dbDir, 'campaign.db');
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   
@@ -19,6 +21,7 @@ export function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
+      email TEXT,
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'dm',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP

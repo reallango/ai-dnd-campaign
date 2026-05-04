@@ -8,11 +8,11 @@ import crypto from 'crypto';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { username, password, isFirstTime } = body;
+    const { username, password, email, isFirstTime } = body;
 
     if (isFirstTime) {
       // Create first admin user
-      const result = createFirstUser(username, password);
+      const result = createFirstUser(username, password, email);
       if (!result.success) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }

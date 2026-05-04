@@ -18,6 +18,7 @@ interface Settings {
 interface User {
   id: number;
   username: string;
+  email: string;
   role: string;
   created_at: string;
 }
@@ -41,7 +42,7 @@ export default function AdminPage() {
   const [loadedModels, setLoadedModels] = useState<string[]>([]);
   const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email'>('settings');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +55,19 @@ export default function AdminPage() {
 
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'gm' | 'admin'>('gm');
+  
+  // SMTP settings state
+  const [smtpSettings, setSmtpSettings] = useState({
+    smtp_host: '',
+    smtp_port: '587',
+    smtp_user: '',
+    smtp_pass: '',
+    smtp_from: '',
+    smtp_tls: true,
+  });
+  const [testingEmail, setTestingEmail] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -102,6 +115,33 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to save settings');
+      }
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSmtpSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSaved(false);
+
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(smtpSettings),
       });
 
       if (!res.ok) {
@@ -217,7 +257,7 @@ export default function AdminPage() {
       const res = await fetch('/api/auth/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole }),
+        body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole, email: newEmail }),
       });
 
       if (!res.ok) {
@@ -227,6 +267,7 @@ export default function AdminPage() {
 
       setNewUsername('');
       setNewPassword('');
+      setNewEmail('');
       const usersRes = await fetch('/api/admin/users');
       const usersData = await usersRes.json();
       setUsers(usersData.users || []);
@@ -337,6 +378,12 @@ export default function AdminPage() {
             className={`px-4 py-2 rounded-lg ${activeTab === 'tokens' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             🔑 API Tokens
+          </button>
+          <button
+            onClick={() => setActiveTab('email')}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'email' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            📧 Email
           </button>
           <button
             onClick={() => router.push('/dashboard')}
@@ -537,6 +584,13 @@ export default function AdminPage() {
                 className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
               />
               <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="Email (optional)"
+                className="w-40 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+              />
+              <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -557,6 +611,7 @@ export default function AdminPage() {
                 <div key={user.id} className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
                   <div>
                     <span className="text-white">{user.username}</span>
+                    {user.email && <span className="text-slate-400 ml-2">({user.email})</span>}
                     <span className="text-slate-400 ml-2">({user.role})</span>
                   </div>
                   <button onClick={() => deleteUser(user.id)} className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40">
@@ -626,6 +681,94 @@ export default function AdminPage() {
               ))}
               {apiTokens.length === 0 && <p className="text-slate-500">No API tokens yet</p>}
             </div>
+          </div>
+        )}
+        
+        {activeTab === 'email' && (
+          <div className="bg-slate-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Email Settings (SMTP)</h2>
+            <p className="text-slate-400 text-sm mb-4">
+              Configure SMTP settings to enable password reset emails and other automated notifications.
+            </p>
+            
+            <form onSubmit={saveSmtpSettings} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">SMTP Host</label>
+                  <input
+                    type="text"
+                    value={smtpSettings.smtp_host}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_host: e.target.value })}
+                    placeholder="smtp.example.com"
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">SMTP Port</label>
+                  <input
+                    type="text"
+                    value={smtpSettings.smtp_port}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_port: e.target.value })}
+                    placeholder="587"
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">SMTP Username</label>
+                  <input
+                    type="text"
+                    value={smtpSettings.smtp_user}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_user: e.target.value })}
+                    placeholder="user@example.com"
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">SMTP Password</label>
+                  <input
+                    type="password"
+                    value={smtpSettings.smtp_pass}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_pass: e.target.value })}
+                    placeholder="********"
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-slate-300 text-sm mb-1">From Address</label>
+                <input
+                  type="text"
+                  value={smtpSettings.smtp_from}
+                  onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_from: e.target.value })}
+                  placeholder="noreply@example.com"
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                />
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="smtpTls"
+                  checked={smtpSettings.smtp_tls}
+                  onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_tls: e.target.checked })}
+                  className="w-5 h-5 bg-slate-700 border border-slate-600 rounded"
+                />
+                <label htmlFor="smtpTls" className="text-slate-300">
+                  Use TLS/SSL (recommended)
+                </label>
+              </div>
+              
+              {error && <div className="text-red-400 text-sm">{error}</div>}
+              {saved && <div className="text-emerald-400 text-sm">Settings saved!</div>}
+              
+              <button type="submit" disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                {loading ? 'Saving...' : 'Save Email Settings'}
+              </button>
+            </form>
           </div>
         )}
       </main>

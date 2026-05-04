@@ -23,13 +23,13 @@ export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id');
     const body = await request.json();
-    const { username, password, role } = body;
+    const { username, password, role, email } = body;
     
     if (!userId || !checkIsAdmin(parseInt(userId))) {
       return NextResponse.json({ error: 'Admin only' }, { status: 403 });
     }
     
-    const result = createUser(username, password, role);
+    const result = createUser(username, password, role, email);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
