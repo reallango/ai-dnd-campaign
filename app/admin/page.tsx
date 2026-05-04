@@ -68,6 +68,7 @@ export default function AdminPage() {
   // Email tab state
   const [testEmail, setTestEmail] = useState('');
   const [testEmailStatus, setTestEmailStatus] = useState('');
+  const [smtpSaved, setSmtpSaved] = useState(false);
   
   // SMTP settings state
   const [smtpSettings, setSmtpSettings] = useState({
@@ -171,8 +172,8 @@ export default function AdminPage() {
         throw new Error(data.error || 'Failed to save settings');
       }
 
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      setSmtpSaved(true);
+      setTimeout(() => setSmtpSaved(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -908,7 +909,7 @@ export default function AdminPage() {
               </div>
               
               {error && <div className="text-red-400 text-sm">{error}</div>}
-              {saved && <div className="text-emerald-400 text-sm">Settings saved!</div>}
+              {smtpSaved && <div className="text-emerald-400 text-sm">Settings saved!</div>}
               
               <button type="submit" disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                 {loading ? 'Saving...' : 'Save Email Settings'}
