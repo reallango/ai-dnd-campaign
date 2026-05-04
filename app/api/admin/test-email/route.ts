@@ -32,11 +32,13 @@ export async function POST(request: NextRequest) {
     
     // Check SMTP settings
     const emailSettings = getEmailSettings();
+    console.log('Email settings:', emailSettings);
     if (!emailSettings || !emailSettings.smtp_host || !emailSettings.smtp_user) {
       return NextResponse.json({ error: 'SMTP settings not configured' }, { status: 400 });
     }
     
     // Send test email
+    console.log('Sending test email to:', to);
     const result = await sendEmail({
       to,
       subject: 'Test Email from AI DND Campaign',
@@ -54,10 +56,11 @@ export async function POST(request: NextRequest) {
     if (result.success) {
       return NextResponse.json({ success: true });
     } else {
+      console.error('Test email failed:', result.error);
       return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
     }
   } catch (error) {
-    console.error('Test email error:', error);
+    console.error('Test email exception:', error);
     return NextResponse.json({ error: 'Failed to send test email' }, { status: 500 });
   }
 }
