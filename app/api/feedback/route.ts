@@ -1,3 +1,16 @@
+/**
+ * Feedback API - Creates GitHub issues for bugs/features
+ * 
+ * GITHUB_TOKEN permissions needed:
+ * - Option 1: Classic token with 'repo' scope (full private repo access)
+ * - Option 2: Classic token with 'public_repo' scope (public repo only)
+ * - Option 3: Fine-grained token with:
+ *   - Repository: ai-dnd-campaign
+ *   - Permissions: Issues -> Read and write
+ * 
+ * Set GITHUB_TOKEN in your deployment environment variables.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // POST /api/feedback - Create GitHub issue
