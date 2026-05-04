@@ -260,7 +260,7 @@ export default function AdminPage() {
     setError('');
 
     try {
-      const res = await fetch('/api/auth/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole, email: newEmail }),
@@ -290,7 +290,7 @@ export default function AdminPage() {
     setError('');
 
     try {
-      const res = await fetch(`/api/auth/users/${editingUser.id}`, {
+      const res = await fetch(`/api/admin/users?id=${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
