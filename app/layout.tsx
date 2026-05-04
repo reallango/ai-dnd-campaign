@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { FeedbackButton } from "@/components/FeedbackButton";
+import { AppFooter } from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "AI D&D Campaign Manager",
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <FeedbackButton page="Global" />
+        <AppFooter />
       </body>
     </html>
   );

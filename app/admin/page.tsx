@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [loadedModels, setLoadedModels] = useState<string[]>([]);
   const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email' | 'updates'>('settings');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -80,6 +80,18 @@ export default function AdminPage() {
     smtp_tls: true,
   });
   const [testingEmail, setTestingEmail] = useState(false);
+
+  // Updates tab state
+  const [versionInfo, setVersionInfo] = useState<{
+    currentVersion?: string;
+    currentBranch?: string;
+    latestCommit?: string;
+    lastUpdated?: string;
+  }>({});
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState('');
+  const [redeploying, setRedeploying] = useState(false);
+  const [redeployStatus, setRedeployStatus] = useState('');
 
   useEffect(() => {
     loadData();
@@ -205,6 +217,49 @@ export default function AdminPage() {
       }
     } catch (err) {
       setTestEmailStatus(err instanceof Error ? err.message : 'Failed to send test email');
+    }
+  };
+
+  const checkForUpdates = async () => {
+    setCheckingUpdates(true);
+    setUpdateStatus('');
+    try {
+      const res = await fetch('/api/admin/version');
+      const data = await res.json();
+      if (res.ok) {
+        setVersionInfo(data);
+        if (data.latestCommit) {
+          setUpdateStatus('Ready to deploy. Click Redeploy Stack to update.');
+        }
+      } else {
+        setUpdateStatus(data.error || 'Failed to check for updates');
+      }
+    } catch (err) {
+      setUpdateStatus(err instanceof Error ? err.message : 'Failed to check for updates');
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const triggerRedeploy = async () => {
+    setRedeploying(true);
+    setRedeployStatus('');
+    try {
+      const res = await fetch('/api/admin/redeploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'redeploy' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRedeployStatus('Redeploy triggered successfully!');
+      } else {
+        setRedeployStatus(data.error || 'Failed to trigger redeploy');
+      }
+    } catch (err) {
+      setRedeployStatus(err instanceof Error ? err.message : 'Failed to trigger redeploy');
+    } finally {
+      setRedeploying(false);
     }
   };
 
@@ -467,6 +522,12 @@ export default function AdminPage() {
             className={`px-4 py-2 rounded-lg ${activeTab === 'email' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             📧 Email
+          </button>
+          <button
+            onClick={() => setActiveTab('updates')}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'updates' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            🔄 Updates
           </button>
           <button
             onClick={() => router.push('/dashboard')}
@@ -937,6 +998,67 @@ export default function AdminPage() {
                 )}
               </div>
             </form>
+          </div>
+        )}
+
+        {activeTab === 'updates' && (
+          <div className="bg-slate-800 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Software Updates</h2>
+            
+            {/* Version info */}
+            <div className="mb-6 p-4 bg-slate-700 rounded-lg">
+              <div className="text-slate-400 text-sm mb-1">Current Version</div>
+              <div className="text-white text-lg font-mono">{versionInfo.currentVersion || '1.0.0'}</div>
+              <div className="text-slate-400 text-sm mt-2">Branch</div>
+              <div className="text-white font-mono">{versionInfo.currentBranch || 'main'}</div>
+            </div>
+
+            {/* Check for updates */}
+            <button
+              onClick={checkForUpdates}
+              disabled={checkingUpdates}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mr-3"
+            >
+              {checkingUpdates ? 'Checking...' : 'Check for Updates'}
+            </button>
+            
+            {versionInfo.latestCommit && (
+              <div className="mt-4 p-3 bg-slate-700 rounded-lg">
+                <div className="text-slate-400 text-sm">Latest Commit</div>
+                <div className="text-white font-mono text-sm">{versionInfo.latestCommit.slice(0, 7)}</div>
+                <div className="text-slate-500 text-xs mt-1">{versionInfo.lastUpdated}</div>
+              </div>
+            )}
+
+            {updateStatus && (
+              <div className={`mt-4 p-3 rounded-lg ${updateStatus.includes('success') || updateStatus.includes('up to date') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+                <div className={updateStatus.includes('success') || updateStatus.includes('up to date') ? 'text-emerald-400' : 'text-red-400'}>
+                  {updateStatus}
+                </div>
+              </div>
+            )}
+
+            {/* Portainer redeploy */}
+            <div className="mt-8 pt-6 border-t border-slate-600">
+              <h3 className="text-white font-semibold mb-3">Deploy</h3>
+              <p className="text-slate-400 text-sm mb-4">Trigger a redeploy from Portainer to pull the latest changes.</p>
+              
+              <button
+                onClick={triggerRedeploy}
+                disabled={redeploying}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                {redeploying ? 'Triggering...' : 'Redeploy Stack'}
+              </button>
+
+              {redeployStatus && (
+                <div className={`mt-4 p-3 rounded-lg ${redeployStatus.includes('success') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+                  <div className={redeployStatus.includes('success') ? 'text-emerald-400' : 'text-red-400'}>
+                    {redeployStatus}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
