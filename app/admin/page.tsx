@@ -10,6 +10,7 @@ interface Settings {
   ai_api_key: string;
   ai_adult_content: string;
   ai_context_window: string;
+  ai_keep_loaded: string;
   ai_timeout: string;
   models?: string[];
 }
@@ -32,10 +33,13 @@ export default function AdminPage() {
     ai_api_key: '',
     ai_adult_content: 'false',
     ai_context_window: '4096',
+    ai_keep_loaded: '300',
     ai_timeout: '120',
   });
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
+  const [loadedModels, setLoadedModels] = useState<string[]>([]);
+  const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'settings' | 'users'>('settings');
   const [loading, setLoading] = useState(false);
@@ -122,6 +126,49 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Failed to fetch models');
     } finally {
       setFetchingModels(false);
+    }
+  };
+
+  const checkLoadedModels = async () => {
+    setCheckingLoaded(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/models', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.loaded_models) {
+        setLoadedModels(data.loaded_models);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to check loaded models');
+    } finally {
+      setCheckingLoaded(false);
+    }
+  };
+
+  const unloadModel = async (modelName: string) => {
+    if (!confirm(`Unload ${modelName}?`)) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/models', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`${modelName} unloaded`);
+        checkLoadedModels();
+      } else {
+        throw new Error(data.error || 'Failed to unload model');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to unload model');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -326,6 +373,55 @@ export default function AdminPage() {
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-300 text-sm mb-1">Keep Model Loaded (seconds)</label>
+                <select
+                  value={settings.ai_keep_loaded}
+                  onChange={(e) => setSettings({ ...settings, ai_keep_loaded: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                >
+                  <option value="-1"> Forever (-1)</option>
+                  <option value="60">1 minute</option>
+                  <option value="300">5 minutes</option>
+                  <option value="600">10 minutes</option>
+                  <option value="1800">30 minutes</option>
+                  <option value="3600">1 hour</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-300 text-sm mb-1">Check Loaded Models</label>
+                <button 
+                  type="button" 
+                  onClick={checkLoadedModels}
+                  disabled={checkingLoaded || settings.ai_provider !== 'ollama'}
+                  className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg"
+                >
+                  {checkingLoaded ? 'Checking...' : 'Check Loaded Models'}
+                </button>
+              </div>
+            </div>
+
+            {loadedModels.length > 0 && (
+              <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
+                <h4 className="text-white font-medium mb-2">Currently Loaded Models</h4>
+                <div className="space-y-2">
+                  {loadedModels.map(model => (
+                    <div key={model} className="flex justify-between items-center">
+                      <span className="text-slate-300">{model}</span>
+                      <button 
+                        type="button"
+                        onClick={() => unloadModel(model)}
+                        className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40 text-sm"
+                      >
+                        Unload
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {(settings.ai_provider === 'openai' || settings.ai_provider === 'anthropic' || settings.ai_provider === 'deepseek') && (
               <div>

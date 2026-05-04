@@ -1,5 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// GET /api/admin/models - check currently loaded models (Ollama)
+export async function GET() {
+  try {
+    // Get base URL from environment
+    const ai_base_url = process.env.AI_BASE_URL || 'http://localhost:11434';
+    
+    try {
+      const res = await fetch(`${ai_base_url}/api/ps`, {
+        method: 'GET',
+      });
+      const data = await res.json();
+      
+      const loadedModels = (data.models || []).map((m: any) => m.name).filter(Boolean);
+      return NextResponse.json({ loaded_models: loadedModels });
+    } catch (e) {
+      return NextResponse.json({ error: 'Failed to connect to Ollama' }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('Error checking loaded models:', error);
+    return NextResponse.json({ error: 'Failed to check loaded models' }, { status: 500 });
+  }
+}
+
+// DELETE /api/admin/models - unload a specific model (Ollama)
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { model } = body;
+    
+    if (!model) {
+      return NextResponse.json({ error: 'Model name required' }, { status: 400 });
+    }
+    
+    // Get base URL from environment
+    const ai_base_url = process.env.AI_BASE_URL || 'http://localhost:11434';
+    
+    try {
+      // Use /api/generate with keep_alive: 0 to unload the model
+      const res = await fetch(`${ai_base_url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model,
+          prompt: '',
+          options: { keep_alive: 0 }
+        }),
+      });
+      
+      if (!res.ok) {
+        return NextResponse.json({ error: 'Failed to unload model' }, { status: 400 });
+      }
+      
+      return NextResponse.json({ success: true });
+    } catch (e) {
+      return NextResponse.json({ error: 'Failed to connect to Ollama' }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('Error unloading model:', error);
+    return NextResponse.json({ error: 'Failed to unload model' }, { status: 500 });
+  }
+}
+
 // POST /api/admin/models - fetch available models from AI provider
 export async function POST(request: NextRequest) {
   try {
