@@ -10,6 +10,7 @@ export interface AIConfig {
   contextWindow?: number;
   keepLoaded?: number;
   adultContent?: boolean;
+  timeout?: number;  // timeout in seconds
 }
 
 export interface AIRequest {
@@ -49,6 +50,7 @@ function getConfig(): AIConfig {
         contextWindow: parseInt(settings.ai_context_window) || 4096,
         keepLoaded: parseInt(settings.ai_keep_loaded) || 300,
         adultContent: settings.ai_adult_content === 'true',
+        timeout: parseInt(settings.ai_timeout) || 120,
       };
     }
   } catch (e) {
@@ -66,6 +68,7 @@ function getConfig(): AIConfig {
     contextWindow: parseInt(process.env.AI_CONTEXT_WINDOW || '') || 4096,
     keepLoaded: parseInt(process.env.AI_KEEP_LOADED || '') || 300,
     adultContent: process.env.AI_ADULT_CONTENT === 'true',
+    timeout: parseInt(process.env.AI_TIMEOUT || '') || 120,
   };
 }
 
@@ -127,8 +130,9 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
   console.log('Final options:', JSON.stringify(options));
   
   const controller = new AbortController();
-  // 2 minute timeout for first prompt (model needs to load)
-  const timeoutId = setTimeout(() => controller.abort(), 120000);
+  // Use configured timeout (defaults to 120 seconds)
+  const timeoutMs = (config.timeout || 120) * 1000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
     // Use generate endpoint instead of chat

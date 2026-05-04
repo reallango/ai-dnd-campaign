@@ -18,8 +18,9 @@ export async function GET() {
       ai_model: process.env.AI_MODEL || 'llama3',
       ai_api_key: process.env.AI_API_KEY || '',
       ai_context_window: '4096',      // Default 4K context
-      ai_keep_loaded: '300',        // Keep loaded for 5 minutes
-      ai_adult_content: 'false',    // Default filter on for safety
+      ai_keep_loaded: '300',           // Keep loaded for 5 minutes
+      ai_adult_content: 'false',       // Default filter on for safety
+      ai_timeout: '120',              // Default 2 minute timeout
     };
 
     return NextResponse.json({
@@ -30,6 +31,7 @@ export async function GET() {
       ai_context_window: settings.ai_context_window || defaults.ai_context_window,
       ai_keep_loaded: settings.ai_keep_loaded || defaults.ai_keep_loaded,
       ai_adult_content: settings.ai_adult_content || defaults.ai_adult_content,
+      ai_timeout: settings.ai_timeout || defaults.ai_timeout,
     });
   } catch (error) {
     console.error('Error loading settings:', error);
@@ -41,7 +43,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { ai_provider, ai_base_url, ai_model, ai_api_key, ai_context_window, ai_keep_loaded, ai_adult_content } = body;
+    const { 
+      ai_provider, 
+      ai_base_url, 
+      ai_model, 
+      ai_api_key, 
+      ai_context_window, 
+      ai_keep_loaded, 
+      ai_adult_content,
+      ai_timeout 
+    } = body;
 
     const upsert = db.prepare(`
       INSERT INTO settings (key, value, updated_at)
@@ -63,6 +74,7 @@ export async function POST(request: NextRequest) {
       ai_context_window: ai_context_window?.toString() || '4096',
       ai_keep_loaded: ai_keep_loaded?.toString() || '300',
       ai_adult_content: ai_adult_content ? 'true' : 'false',
+      ai_timeout: ai_timeout?.toString() || '120',
     });
 
     return NextResponse.json({ success: true });
