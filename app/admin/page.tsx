@@ -641,8 +641,8 @@ export default function AdminPage() {
                 <option value="gm">GM</option>
                 <option value="admin">Admin</option>
               </select>
-              <button onClick={addUser} disabled={loading || !newUsername || !newPassword} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 whitespace-nowrap">
-                Add User
+              <button onClick={addUser} disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+                {loading ? 'Adding...' : 'Add User'}
               </button>
             </div>
 
