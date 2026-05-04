@@ -40,6 +40,7 @@ function getConfig(): AIConfig {
     for (const row of rows) {
       settings[row.key] = row.value;
     }
+    console.log('DB settings loaded:', settings);
     
     if (settings.ai_provider) {
       return {
@@ -54,10 +55,11 @@ function getConfig(): AIConfig {
       };
     }
   } catch (e) {
-    // Database not available, fall back to env
+    console.log('DB not available, using env:', e);
   }
   
   // Fall back to environment variables
+  console.log('Using env vars: AI_KEEP_LOADED =', process.env.AI_KEEP_LOADED);
   const provider = process.env.AI_PROVIDER || 'ollama';
   
   return {
@@ -125,7 +127,7 @@ async function callOllama(request: AIRequest, config: AIConfig): Promise<AIRespo
   // Keep model loaded (use config if not in request)
   const keepLoaded = request.keepLoaded ?? config.keepLoaded ?? 300;
   options.keep_alive = keepLoaded;
-  console.log('keep_alive setting:', keepLoaded);
+  console.log('keep_alive setting:', keepLoaded, 'config.keepLoaded:', config.keepLoaded);
   
   console.log('Final options:', JSON.stringify(options));
   
