@@ -1,6 +1,7 @@
 // Authentication utilities
 import db from '@/lib/db';
 import crypto from 'crypto';
+import { NextRequest } from 'next/server';
 
 export interface User {
   id: number;
@@ -86,4 +87,73 @@ export function deleteUser(id: number): boolean {
 export function isAdmin(userId: number): boolean {
   const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role: string } | undefined;
   return user?.role === 'admin';
+}
+
+// Get user from API token or session cookie
+export async function getUserFromRequest(request: NextRequest): Promise<{ id: number; username: string; role: string } | null> {
+  // Check header first
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const result = validateApiToken(token);
+    if (result?.valid) {
+      const user = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(result.userId) as { id: number; username: string; role: string } | undefined;
+      if (user) return user;
+    }
+  }
+  
+  // Check query param
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get('token');
+  if (queryToken) {
+    const result = validateApiToken(queryToken);
+    if (result?.valid) {
+      const user = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(result.userId) as { id: number; username: string; role: string } | undefined;
+      if (user) return user;
+    }
+  }
+  
+  return null;
+}
+
+// Validate API token
+export function validateApiToken(token: string): { valid: boolean; userId?: number; expiresAt?: string } | null {
+  try {
+    const session = db.prepare(`
+      SELECT user_id, expires_at 
+      FROM api_tokens 
+      WHERE token = ? AND expires_at > datetime('now')
+    `).get(token) as { user_id: number; expires_at: string } | undefined;
+    
+    if (!session) return null;
+    return { valid: true, userId: session.user_id, expiresAt: session.expires_at };
+  } catch {
+    return null;
+  }
+}
+
+// Create API token
+export function createApiToken(userId: number, name: string, daysValid: number = 90): { token: string; expiresAt: string } {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + daysValid * 24 * 60 * 60 * 1000).toISOString();
+  
+  db.prepare(`
+    INSERT INTO api_tokens (user_id, token, name, expires_at) VALUES (?, ?, ?, ?)
+  `).run(userId, token, name, expiresAt);
+  
+  return { token, expiresAt };
+}
+
+// Get all API tokens for a user
+export function getApiTokens(userId: number): { id: number; name: string; expiresAt: string; createdAt: string }[] {
+  return db.prepare(`
+    SELECT id, name, expires_at as expiresAt, created_at as createdAt
+    FROM api_tokens WHERE user_id = ?
+  `).all(userId) as any[];
+}
+
+// Revoke API token
+export function revokeApiToken(id: number, userId: number): boolean {
+  const result = db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?').run(id, userId);
+  return result.changes > 0;
 }

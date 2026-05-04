@@ -41,10 +41,16 @@ export default function AdminPage() {
   const [loadedModels, setLoadedModels] = useState<string[]>([]);
   const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'settings' | 'users'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens'>('settings');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  
+  // API tokens state
+  const [apiTokens, setApiTokens] = useState<{id: number; name: string; expiresAt: string; createdAt: string}[]>([]);
+  const [newTokenName, setNewTokenName] = useState('');
+  const [newTokenDays, setNewTokenDays] = useState(90);
+  const [generatedToken, setGeneratedToken] = useState('');
 
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -56,15 +62,17 @@ export default function AdminPage() {
 
   const loadData = async () => {
     try {
-      const [meRes, settingsRes, usersRes] = await Promise.all([
+      const [meRes, settingsRes, usersRes, tokensRes] = await Promise.all([
         fetch('/api/auth/me'),
         fetch('/api/admin/settings'),
         fetch('/api/admin/users'),
+        fetch('/api/auth/tokens'),
       ]);
       
       const meData = await meRes.json();
       const settingsData = await settingsRes.json();
       const usersData = await usersRes.json();
+      const tokensData = await tokensRes.json();
       
       if (!meData.user || meData.user.role !== 'admin') {
         router.push('/');
@@ -76,6 +84,7 @@ export default function AdminPage() {
         setSettings(settingsData);
       }
       setUsers(usersData.users || []);
+      setApiTokens(tokensData.tokens || []);
       setMounted(true);
     } catch (e) {
       router.push('/');
@@ -246,6 +255,50 @@ export default function AdminPage() {
     router.push('/');
   };
 
+  const createToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setGeneratedToken('');
+    try {
+      const res = await fetch('/api/auth/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTokenName, daysValid: newTokenDays }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create token');
+      setGeneratedToken(data.token);
+      setNewTokenName('');
+      // Refresh tokens list
+      const tokensRes = await fetch('/api/auth/tokens');
+      const tokensData = await tokensRes.json();
+      setApiTokens(tokensData.tokens || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const revokeToken = async (id: number) => {
+    if (!confirm('Revoke this token? Any apps using it will lose access.')) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/auth/tokens?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to revoke token');
+      // Refresh tokens list
+      const tokensRes = await fetch('/api/auth/tokens');
+      const tokensData = await tokensRes.json();
+      setApiTokens(tokensData.tokens || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
@@ -278,6 +331,12 @@ export default function AdminPage() {
             className={`px-4 py-2 rounded-lg ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             👥 Users
+          </button>
+          <button
+            onClick={() => setActiveTab('tokens')}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'tokens' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            🔑 API Tokens
           </button>
           <button
             onClick={() => router.push('/dashboard')}
@@ -506,6 +565,66 @@ export default function AdminPage() {
                 </div>
               ))}
               {users.length === 0 && <p className="text-slate-500">No users yet</p>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'tokens' && (
+          <div className="bg-slate-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">API Tokens</h2>
+            <p className="text-slate-400 text-sm mb-4">
+              Create tokens to give AI agents access to your campaign data. Tokens can be passed via URL query parameter (?token=xxx) or Authorization header.
+            </p>
+            
+            <form onSubmit={createToken} className="flex gap-2 mb-4 p-4 bg-slate-700/50 rounded-lg items-end">
+              <div className="flex-1">
+                <label className="block text-slate-300 text-sm mb-1">Token Name</label>
+                <input
+                  type="text"
+                  value={newTokenName}
+                  onChange={(e) => setNewTokenName(e.target.value)}
+                  placeholder="e.g., OpenWebUI, AI Agent"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                />
+              </div>
+              <div className="w-32">
+                <label className="block text-slate-300 text-sm mb-1">Days Valid</label>
+                <select
+                  value={newTokenDays}
+                  onChange={(e) => setNewTokenDays(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                >
+                  <option value="7">7 days</option>
+                  <option value="30">30 days</option>
+                  <option value="90">90 days</option>
+                  <option value="365">1 year</option>
+                </select>
+              </div>
+              <button type="submit" disabled={loading || !newTokenName} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 whitespace-nowrap">
+                Create Token
+              </button>
+            </form>
+
+            {generatedToken && (
+              <div className="mb-4 p-4 bg-green-900/30 border border-green-600 rounded-lg">
+                <p className="text-green-400 text-sm font-medium mb-1">Token created! Copy it now - you won't see it again:</p>
+                <code className="text-green-300 text-sm break-all">{generatedToken}</code>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {apiTokens.map(token => (
+                <div key={token.id} className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                  <div>
+                    <span className="text-white">{token.name}</span>
+                    <span className="text-slate-400 ml-2 text-sm">Expires: {new Date(token.expiresAt).toLocaleDateString()}</span>
+                  </div>
+                  <button onClick={() => revokeToken(token.id)} className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40">
+                    Revoke
+                  </button>
+                </div>
+              ))}
+              {apiTokens.length === 0 && <p className="text-slate-500">No API tokens yet</p>}
             </div>
           </div>
         )}
