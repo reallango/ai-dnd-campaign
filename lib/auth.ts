@@ -158,3 +158,61 @@ export function revokeApiToken(id: number, userId: number): boolean {
   const result = db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?').run(id, userId);
   return result.changes > 0;
 }
+
+// Generate password reset token
+export function generatePasswordResetToken(userId: number): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+  
+  db.prepare(`
+    UPDATE users SET password_reset_token = ?, password_reset_expires = ?
+    WHERE id = ?
+  `).run(token, expiresAt, userId);
+  
+  return token;
+}
+
+// Validate password reset token
+export function validatePasswordResetToken(token: string): { valid: boolean; userId?: number; email?: string; username?: string } {
+  try {
+    const user = db.prepare(`
+      SELECT id, email, username FROM users 
+      WHERE password_reset_token = ? AND password_reset_expires > datetime('now')
+    `).get(token) as { id: number; email: string; username: string } | undefined;
+    
+    if (!user) return { valid: false };
+    return { valid: true, userId: user.id, email: user.email, username: user.username };
+  } catch {
+    return { valid: false };
+  }
+}
+
+// Reset password with token
+export function resetPassword(token: string, newPassword: string): { success: boolean; error?: string } {
+  try {
+    const validation = validatePasswordResetToken(token);
+    if (!validation.valid || !validation.userId) {
+      return { success: false, error: 'Invalid or expired token' };
+    }
+    
+    const hash = hashPassword(newPassword);
+    db.prepare(`
+      UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL
+      WHERE id = ?
+    `).run(hash, validation.userId);
+    
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to reset password' };
+  }
+}
+
+// Get user by email for password reset
+export function getUserByEmail(email: string): { id: number; email: string; username: string } | null {
+  try {
+    const user = db.prepare('SELECT id, email, username FROM users WHERE email = ?').get(email) as { id: number; email: string; username: string } | undefined;
+    return user || null;
+  } catch {
+    return null;
+  }
+}

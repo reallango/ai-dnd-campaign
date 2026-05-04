@@ -140,6 +140,14 @@ export default function LoginPage() {
           </div>
         </form>
 
+        {!isFirstTime && (
+          <div className="text-center mt-4">
+            <a href="/forgot-password" className="text-gold hover:underline text-sm">
+              Forgot Password?
+            </a>
+          </div>
+        )}
+
         <footer className="footer">
           <p className="text-muted">
             <a href="/" className="text-gold">← Back to Home</a>

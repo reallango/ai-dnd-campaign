@@ -24,6 +24,8 @@ export function initDb() {
       email TEXT,
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'dm',
+      password_reset_token TEXT,
+      password_reset_expires DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     
