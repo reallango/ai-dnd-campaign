@@ -13,6 +13,7 @@ services:
       - db_data:/app/data
     environment:
       - NODE_ENV=production
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
     restart: always
 
 volumes:
