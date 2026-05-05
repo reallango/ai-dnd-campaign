@@ -1,1 +1,1 @@
-export const BUILD_HASH: string = 'localdev'
+export const BUILD_HASH: string = '8912e47'

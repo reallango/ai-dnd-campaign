@@ -1,86 +1,62 @@
 # 1. OBJECTIVE
 
-Fix the commit hash - build generates 13e4ea5 but API returns "docker". Need to ensure consistency between what gets written and what gets read.
+Consolidate the updates and portainer pages into tabs on the main admin page, pulling version/build info from the API.
 
 # 2. CONTEXT SUMMARY
 
-- **Build log shows**: `Build hash: 13e4ea5` - getting written correctly
-- **API returns**: `docker` - old/stale value or wrong file being read
-- **Root cause**: Likely a cached image or the old prebuild script value
+Current state:- `/app/admin/page.tsx` - main admin page with some tabs (settings, users, tokens, email, updates)
+- `/app/admin/updates/page.tsx` - separate page (not used)
+- `/app/admin/portainer/page.tsx` - separate page (not used)Both separate pages aren't linked/used. User wants them as tabs on main admin page.
 
 # 3. APPROACH OVERVIEW
 
-1. Fix prebuild script to also use the correct hash
-2. Update API to check both possible file locations  
-3. Clear any caches
+1. Add Portainer as a new tab on admin page
+2. Move version/build display from the updates page to the updates tab  
+3. Fetch actual build hash from `/api/version` API
 
 # 4. IMPLEMENTATION STEPS
 
-**Step 1: Fix prebuild script in package.json**
+**In `/app/admin/page.tsx`:**
 
-Change from:
-```json
-"prebuild": "echo \"export const BUILD_HASH: string = 'localdev'\" > src/buildInfo.ts",
+1. **Add Portainer tab to the tabs list:**
+```tsx
+const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer'>('settings');
 ```
 
-To:
-```json
-"prebuild": "echo \"export const BUILD_HASH: string = '$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')\" > src/buildInfo.ts",
+2. **Add state to fetch build hash:**
+```tsx
+const [buildInfo, setBuildInfo] = useState<{version: string; build: string; buildHash: string} | null>(null);
+
+useEffect(() => {
+  fetch('/api/version')
+    .then(r => r.json())
+    .then(data => setBuildInfo(data))
+    .catch(() => setBuildInfo(null));
+}, []);
 ```
 
-**Step 2: Also write to src/buildInfo.ts in next.config.js**
-
-Add to next.config.js, after writing build-info.json:
-```js
-writeFileSync(
-  "./src/buildInfo.ts", 
-  `export const BUILD_HASH: string = '${commitHash}'`
-);
+3. **Update the Updates tab to show API data:**
+```tsx
+<div className="mb-6 p-4 bg-slate-700 rounded-lg">
+  <div className="text-slate-400 text-sm mb-1">App Version</div>
+  <div className="text-white text-lg font-mono">{buildInfo?.version || 'unknown'}</div>
+  <div className="text-slate-400 text-sm mt-2">Build</div>
+  <div className="text-white font-mono">{buildInfo?.build || buildInfo?.buildHash || 'unknown'}</div>
+</div>
 ```
 
-**Step 3: Update version API to check multiple locations**
+4. **Add content to Portainer tab** (move from app/admin/portainer/page.tsx):
+- Include the Portainer branch selection and deploy functionality
+- Show current deploy status
 
-```ts
-export async function GET() {
-  let buildHash = "unknown";
-  
-  // Check build-info.json (written by next.config.js)
-  const buildInfoPath = join(process.cwd(), "build-info.json");
-  if (existsSync(buildInfoPath)) {
-    try {
-      const buildInfo = JSON.parse(readFileSync(buildInfoPath, "utf8"));
-      buildHash = buildInfo.buildHash || "unknown";
-    } catch (e) {
-      // ignore
-    }
-  }
-  
-  // Fallback: check src/buildInfo.ts
-  if (buildHash === "unknown") {
-    const tsPath = join(process.cwd(), "src", "buildInfo.ts");
-    if (existsSync(tsPath)) {
-      try {
-        const content = readFileSync(tsPath, "utf8");
-        const match = content.match(/BUILD_HASH.*?=.*?['"]([^'"]+)['"]/);
-        if (match) {
-          buildHash = match[1];
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-  }
-  
-  return NextResponse.json({
-    version: '0.0.1',
-    build: buildHash,
-    buildHash: buildHash
-  });
-}
-```
+5. **Remove the now-unused separate pages** (optional - can delete):
+- `app/admin/updates/page.tsx`
+- `app/admin/portainer/page.tsx`
+
+Also ensure the API route has `export const dynamic = 'force-dynamic'` so it runs at runtime.
 
 # 5. TESTING AND VALIDATION
 
-- Rebuild Docker image fresh (no cache)
-- Verify build log shows hash being written
-- Curl API returns correct hash
+- Rebuild and deploy
+- Check admin page has new "Updates" and "Portainer" tabs
+- Each tab displays correct information from API

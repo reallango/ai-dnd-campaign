@@ -43,7 +43,7 @@ export default function AdminPage() {
   const [loadedModels, setLoadedModels] = useState<string[]>([]);
   const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email' | 'updates'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer'>('settings');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -90,6 +90,7 @@ export default function AdminPage() {
     lastUpdated?: string;
   }>({});
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [buildInfo, setBuildInfo] = useState<{version: string; build: string; buildHash: string} | null>(null);
   const [updateStatus, setUpdateStatus] = useState('');
   const [redeploying, setRedeploying] = useState(false);
   const [redeployStatus, setRedeployStatus] = useState('');
@@ -605,6 +606,13 @@ export default function AdminPage() {
           >
             🔄 Updates
           </button>
+          <button
+            onClick={() => setActiveTab('portainer')}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'portainer' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            🐳 Portainer
+          </button>
+<button            onClick={() => setActiveTab('portainer')}            className={`px-4 py-2 rounded-lg ${activeTab === 'portainer' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}          >            🐳 Portainer          </button>
           <button
             onClick={() => router.push('/dashboard')}
             className="px-4 py-2 rounded-lg text-slate-400 hover:text-white"
@@ -1154,3 +1162,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
