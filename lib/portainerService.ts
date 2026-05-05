@@ -74,7 +74,7 @@ export async function discoverStack(): Promise<{
   // Fetch all stacks
   const response = await fetch(`${url}/api/stacks`, {
     headers: {
-      'X-Api-Key': token,
+      'Authorization': `Bearer ${token}`,
     },
   });
 
@@ -214,7 +214,7 @@ export async function applyUpdate(): Promise<{
   const updateResponse = await fetch(`${url}/api/stacks/${stackInfo.stackId}`, {
     method: 'PUT',
     headers: {
-      'X-Api-Key': token,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -245,7 +245,7 @@ export async function applyUpdate(): Promise<{
           {
             method: 'POST',
             headers: {
-              'X-Api-Key': token,
+              'Authorization': `Bearer ${token}`,
             },
           }
         );
@@ -262,7 +262,7 @@ export async function applyUpdate(): Promise<{
       {
         method: 'POST',
         headers: {
-          'X-Api-Key': token,
+          'Authorization': `Bearer ${token}`,
         },
       }
     );
