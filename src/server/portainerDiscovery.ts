@@ -79,7 +79,8 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
     try {
       const response = await fetch(`${candidate}/api/system/status`, {
         method: 'GET',
-        // No auth needed for status endpoint
+        // Allow self-signed certs for HTTPS
+        agent: candidate.startsWith('https://') ? insecureAgent : undefined,
       } as any);
       
       if (response.ok) {
@@ -90,8 +91,8 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
           return { ok: true, url: candidate };
         }
       }
-    } catch {
-      console.log(`[Portainer] Not reachable: ${candidate}`);
+    } catch (e) {
+      console.log(`[Portainer] Not reachable: ${candidate}`, e instanceof Error ? e.message : '');
     }
   }
   
