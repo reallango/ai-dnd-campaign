@@ -3,22 +3,7 @@ const nextConfig = {
   webpack: (config) => {
     const fs = require("fs");
     const { execSync } = require("child_process");
-    let shortCommit = "docker";
-
-    // First try .env.build (updated by GitHub Action)
-    try {
-      if (fs.existsSync(".env.build")) {
-        const lines = fs.readFileSync(".env.build", "utf8").trim().split("\n");
-        for (const line of lines) {
-          if (line.startsWith("GIT_COMMIT=")) {
-            shortCommit = line.substring(11).trim();
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      console.log("Error reading .env.build:", e.message);
-    }
+    let shortCommit = process.env.GIT_COMMIT || "docker";
 
     // Fallback to git rev-parse
     if (shortCommit === "docker" || shortCommit.length < 3) {
