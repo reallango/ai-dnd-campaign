@@ -26,7 +26,7 @@ export default function PortainerPage() {
   const [stack, setStack] = useState<StackInfo | null>(null);
   const [branch, setBranch] = useState('');
   const [updating, setUpdating] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; missingEnv?: string[] } | null>(null);
 
   const canUpdate = status?.ok && stack?.ok && stack.name && branch.trim() && !updating;
 
@@ -72,7 +72,7 @@ export default function PortainerPage() {
       if (res.ok && data.ok) {
         setMessage({ type: 'success', text: data.message });
       } else {
-        setMessage({ type: 'error', text: data.error || 'Update failed' });
+        setMessage({ type: 'error', text: data.error || 'Update failed', missingEnv: data.missingEnv });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Request failed' });
@@ -97,6 +97,11 @@ export default function PortainerPage() {
           <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
             <p className="text-red-400 font-semibold">Missing Portainer API token</p>
             <p className="text-red-300 text-sm mt-1">Set environment variable: PORTAINER_API_TOKEN</p>
+            {status?.missingEnv && status.missingEnv.length > 0 && (
+              <div className="mt-2 text-sm text-red-400">
+                Missing environment variables: {status.missingEnv.join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -104,6 +109,11 @@ export default function PortainerPage() {
           <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
             <p className="text-red-400 font-semibold">Unable to detect Portainer API URL</p>
             <p className="text-red-300 text-sm mt-1">Set PORTAINER_API_URL or fix network connectivity.</p>
+            {status?.missingEnv && status.missingEnv.length > 0 && (
+              <div className="mt-2 text-sm text-red-400">
+                Missing environment variables: {status.missingEnv.join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -111,6 +121,11 @@ export default function PortainerPage() {
           <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
             <p className="text-red-400 font-semibold">Unable to auto-detect stack</p>
             <p className="text-red-300 text-sm mt-1">Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME.</p>
+            {stack?.missingEnv && stack.missingEnv.length > 0 && (
+              <div className="mt-2 text-sm text-red-400">
+                Missing environment variables: {stack.missingEnv.join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -118,6 +133,11 @@ export default function PortainerPage() {
           <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
             <p className="text-red-400 font-semibold">Multiple stacks match this repo</p>
             <p className="text-red-300 text-sm mt-1">Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME to disambiguate.</p>
+            {stack?.missingEnv && stack.missingEnv.length > 0 && (
+              <div className="mt-2 text-sm text-red-400">
+                Missing environment variables: {stack.missingEnv.join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -229,7 +249,12 @@ export default function PortainerPage() {
               <div className={`p-3 rounded ${
                 message.type === 'success' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
               }`}>
-                {message.text}
+                <div>{message.text}</div>
+                {message.missingEnv && message.missingEnv.length > 0 && (
+                  <div className="mt-2 text-sm">
+                    Missing environment variables: {message.missingEnv.join(', ')}
+                  </div>
+                )}
               </div>
             )}
           </div>

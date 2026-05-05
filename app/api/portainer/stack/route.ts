@@ -16,7 +16,7 @@ export async function GET() {
       return NextResponse.json({
         ok: false,
         error: result.error,
-        missingEnv: result.missingEnv,
+        missingEnv: result.missingEnv ?? null,
       });
     }
     

@@ -18,8 +18,8 @@ export async function GET() {
   return NextResponse.json({
     ok: false,
     reachable: false,
-    apiUrl: getPortainerUrl(),
+    apiUrl: null,
     error: result.error,
-    missingEnv: result.missingEnv,
+    missingEnv: result.missingEnv ?? null,
   });
 }

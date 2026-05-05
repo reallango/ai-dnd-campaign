@@ -41,16 +41,34 @@ export interface StackFound {
 export type StackResult = StackFound | StackError;
 
 /**
- * Normalize URL for comparison:
+ * Normalize Git URL for comparison:
+ * - Convert SSH URLs (git@github.com:) to HTTPS
  * - lowercase
  * - strip trailing ".git"
  * - strip trailing slashes
  */
-function normalizeUrl(url: string): string {
-  return url
-    .toLowerCase()
-    .replace(/\.git$/, '')
-    .replace(/\/$/, '');
+function normalizeGitUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  let u = url.trim().toLowerCase();
+
+  // Convert SSH → HTTPS
+  // git@github.com:reallango/ai-dnd-campaign.git
+  if (u.startsWith('git@github.com:')) {
+    u = u.replace('git@github.com:', 'https://github.com/');
+  }
+
+  // Strip trailing .git
+  if (u.endsWith('.git')) {
+    u = u.slice(0, -4);
+  }
+
+  // Strip trailing slashes
+  while (u.endsWith('/')) {
+    u = u.slice(0, -1);
+  }
+
+  return u;
 }
 
 /**
@@ -227,19 +245,19 @@ export async function findTargetStack(): Promise<StackResult> {
   // 3. Else → attempt Git-based auto-detection
   const owner = process.env.GITHUB_OWNER || 'reallango';
   const repo = process.env.GITHUB_REPO || 'ai-dnd-campaign';
-  const targetUrl = normalizeUrl(`https://github.com/${owner}/${repo}.git`);
+  const targetRepo = normalizeGitUrl(`https://github.com/${owner}/${repo}`);
   
   const stacks = await getStacks();
   
-  // Find stacks matching the repo URL
-  const matchingStacks = stacks.filter(s => {
-    const stackUrl = s.GitConfig?.URL || s.RepositoryURL || '';
-    return normalizeUrl(stackUrl) === targetUrl;
+  // Find stacks matching the repo URL (using normalized comparison)
+  const gitMatches = stacks.filter(s => {
+    const stackRepo = normalizeGitUrl(s.GitConfig?.URL);
+    return stackRepo && targetRepo && stackRepo === targetRepo;
   });
   
   // 4. If exactly one match → return it
-  if (matchingStacks.length === 1) {
-    const stack = matchingStacks[0];
+  if (gitMatches.length === 1) {
+    const stack = gitMatches[0];
     const webhooks = stack.AutoUpdate?.Webhook ? [stack.AutoUpdate.Webhook] : [];
     return {
       ok: true,
@@ -252,10 +270,10 @@ export async function findTargetStack(): Promise<StackResult> {
   }
   
   // 5. If zero matches → return error with missingEnv
-  if (matchingStacks.length === 0) {
+  if (gitMatches.length === 0) {
     return {
       ok: false,
-      error: 'Stack not found',
+      error: 'No Git-based stack matched the repository URL',
       missingEnv: ['PORTAINER_STACK_ID', 'PORTAINER_STACK_NAME'],
     };
   }
@@ -263,7 +281,7 @@ export async function findTargetStack(): Promise<StackResult> {
   // 6. If multiple matches → return error with missingEnv
   return {
     ok: false,
-    error: 'Multiple stacks match this repo',
+    error: 'Multiple Git-based stacks match this repository',
     missingEnv: ['PORTAINER_STACK_ID', 'PORTAINER_STACK_NAME'],
   };
 }

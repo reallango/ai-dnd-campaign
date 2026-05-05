@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: false,
       error: stackResult.error,
-      missingEnv: stackResult.missingEnv,
+      missingEnv: stackResult.missingEnv ?? null,
     });
   }
   
