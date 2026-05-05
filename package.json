@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "prebuild": "echo \"export const BUILD_HASH: string = '$(git rev-parse --short HEAD)'\" > src/buildInfo.ts",
+    "prepare": "npm run prebuild",
     "postinstall": "if [ ! -f src/buildInfo.ts ]; then npm run prebuild; fi",
     "dev": "next dev",
     "build": "NEXT_PUBLIC_BUILD_HASH=$(git rev-parse --short HEAD) next build --webpack",
