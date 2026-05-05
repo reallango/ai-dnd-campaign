@@ -21,5 +21,6 @@ export async function GET() {
     apiUrl: null,
     error: result.error,
     missingEnv: result.missingEnv ?? null,
+    tried: (result as any).tried ?? null,
   });
 }

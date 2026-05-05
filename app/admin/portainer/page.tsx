@@ -8,6 +8,7 @@ interface PortainerStatus {
   apiUrl: string | null;
   error: string | null;
   missingEnv: string[] | null;
+  tried: string[] | null;
 }
 
 interface StackInfo {
@@ -81,76 +82,65 @@ export default function PortainerPage() {
     }
   };
 
-  // Determine error states
-  const tokenMissing = status?.missingEnv?.includes('PORTAINER_API_TOKEN') ?? false;
-  const apiUrlMissing = !status?.reachable && status?.error?.includes('Unable to detect');
-  const stackNotFound = status?.reachable && stack && !stack.ok && stack.error?.includes('not found');
-  const stackMultiple = status?.reachable && stack && !stack.ok && stack.error?.includes('Multiple');
+  // Determine error states  
+  const stackNotFound = status?.reachable && stack && !stack.ok && stack.error?.includes('No Git-based');
+  const stackMultiple = status?.reachable && stack && !stack.ok && stack.error?.includes('Multiple Git-based');
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Portainer Integration</h1>
 
-        {/* Error Messages */}
-        {tokenMissing && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
-            <p className="text-red-400 font-semibold">Missing Portainer API token</p>
-            <p className="text-red-300 text-sm mt-1">Set environment variable: PORTAINER_API_TOKEN</p>
-            {status?.missingEnv && status.missingEnv.length > 0 && (
-              <div className="mt-2 text-sm text-red-400">
-                Missing environment variables: {status.missingEnv.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-
-        {apiUrlMissing && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
-            <p className="text-red-400 font-semibold">Unable to detect Portainer API URL</p>
-            <p className="text-red-300 text-sm mt-1">Set PORTAINER_API_URL or fix network connectivity.</p>
-            {status?.missingEnv && status.missingEnv.length > 0 && (
-              <div className="mt-2 text-sm text-red-400">
-                Missing environment variables: {status.missingEnv.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-
-        {stackNotFound && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
-            <p className="text-red-400 font-semibold">Unable to auto-detect stack</p>
-            <p className="text-red-300 text-sm mt-1">Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME.</p>
-            {stack?.missingEnv && stack.missingEnv.length > 0 && (
-              <div className="mt-2 text-sm text-red-400">
-                Missing environment variables: {stack.missingEnv.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-
-        {stackMultiple && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
-            <p className="text-red-400 font-semibold">Multiple stacks match this repo</p>
-            <p className="text-red-300 text-sm mt-1">Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME to disambiguate.</p>
-            {stack?.missingEnv && stack.missingEnv.length > 0 && (
-              <div className="mt-2 text-sm text-red-400">
-                Missing environment variables: {stack.missingEnv.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Status Section */}
         <div className="mb-6 p-4 bg-slate-800 rounded-lg">
           <h2 className="text-lg font-semibold mb-3">Portainer Status</h2>
           
+          {/* Status error block with missingEnv */}
+          {status && !status.ok && (
+            <div className="bg-red-900/40 border border-red-700 text-red-300 p-4 rounded mb-3">
+              <div className="font-semibold mb-1">
+                {status.error || "Portainer status error"}
+              </div>
+
+              {/* Show missing environment variables */}
+              {status.missingEnv && status.missingEnv.length > 0 && (
+                <div className="text-sm text-red-400">
+                  Missing environment variables: {status.missingEnv.join(", ")}
+                </div>
+              )}
+
+              {/* Show attempted URLs if provided */}
+              {status.tried && status.tried.length > 0 && (
+                <div className="text-sm text-red-400 mt-1">
+                  Tried URLs:
+                  <ul className="list-disc ml-5">
+                    {status.tried.map((t: string, i: number) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">Status:</span>
-              <span className={status?.reachable ? 'text-green-400' : 'text-red-400'}>
-                {status ? (status.reachable ? 'Reachable' : 'Not reachable') : 'Loading...'}
-              </span>
+            {/* New reachable display */}
+            <div className="mt-2 text-sm">
+              {status?.ok && status.reachable && (
+                <span className="text-green-400">Portainer reachable</span>
+              )}
+
+              {!status?.ok && status?.missingEnv && status.missingEnv.length > 0 && (
+                <span className="text-yellow-400">
+                  Configuration incomplete — missing environment variables.
+                </span>
+              )}
+
+              {!status?.ok && !status?.missingEnv && (
+                <span className="text-red-400">
+                  Portainer unreachable.
+                </span>
+              )}
             </div>
 
             {status?.apiUrl && (
@@ -158,10 +148,6 @@ export default function PortainerPage() {
                 <span className="text-slate-400">API URL:</span>
                 <code className="text-sm">{status.apiUrl}</code>
               </div>
-            )}
-
-            {status?.error && (
-              <div className="text-red-400 text-sm">{status.error}</div>
             )}
           </div>
         </div>
@@ -229,7 +215,7 @@ export default function PortainerPage() {
                 onChange={(e) => setBranch(e.target.value)}
                 placeholder="e.g., main, stable, dev"
                 className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-slate-500"
-                disabled={!status?.reachable}
+                disabled={!status?.ok}
               />
             </div>
 
