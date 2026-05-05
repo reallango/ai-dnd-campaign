@@ -1,6 +1,8 @@
 // Portainer service module
 // Handles stack discovery, branch management, and updates
 
+import { detectPortainerApiUrl, getPortainerUrl } from './portainerDiscovery';
+
 const GITHUB_OWNER = 'reallango';
 const GITHUB_REPO = 'ai-dnd-campaign';
 
@@ -42,14 +44,19 @@ function isValidBranch(branch: string): boolean {
   return validBranches.includes(branch.toLowerCase());
 }
 
-// Get Portainer config from env
-function getPortainerConfig() {
-  const url = process.env.PORTAINER_API_URL;
+// Get Portainer base URL (uses auto-detection)
+async function getBaseUrl(): Promise<string> {
+  return detectPortainerApiUrl();
+}
+
+// Get Portainer config from env and detection
+async function getPortainerConfig() {
+  const url = await getBaseUrl();
   const token = process.env.PORTAINER_API_TOKEN;
   const stackName = process.env.PORTAINER_STACK_NAME;
 
-  if (!url || !token) {
-    throw new Error('Portainer not configured. Set PORTAINER_API_URL and PORTAINER_API_TOKEN.');
+  if (!token) {
+    throw new Error('Portainer not configured. Set PORTAINER_API_TOKEN.');
   }
 
   return { url, token, stackName };
@@ -62,7 +69,7 @@ export async function discoverStack(): Promise<{
   webhookUrl: string | null;
   repositoryUrl: string;
 }> {
-  const { url, token, stackName } = getPortainerConfig();
+  const { url, token, stackName } = await getPortainerConfig();
 
   // Fetch all stacks
   const response = await fetch(`${url}/api/stacks`, {
@@ -123,7 +130,7 @@ export async function getBranches(): Promise<{
   availableBranches: string[];
   versions: Record<string, string>;
 }> {
-  const { url, token } = getPortainerConfig();
+  const { url, token } = await getPortainerConfig();
   const repoUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 
   // Fetch branches from GitHub
@@ -191,7 +198,7 @@ export async function applyUpdate(): Promise<{
   success: boolean;
   message: string;
 }> {
-  const { url, token } = getPortainerConfig();
+  const { url, token } = await getPortainerConfig();
 
   if (!stackInfo.stackId) {
     throw new Error('Stack not discovered. Call discoverStack() first.');
@@ -283,7 +290,13 @@ export function getStackInfo() {
     currentBranch: stackInfo.currentBranch,
     pendingBranch: stackInfo.pendingBranch,
     webhookUrl: stackInfo.webhookUrl,
+    apiUrl: getPortainerUrl(),
   };
+}
+
+// Check if Portainer API is available
+export function isPortainerApiAvailable(): boolean {
+  return getPortainerUrl() !== null;
 }
 
 // Initialize on startup

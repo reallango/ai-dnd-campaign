@@ -14,6 +14,10 @@ services:
     environment:
       - NODE_ENV=production
       - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - PORTAINER_API_TOKEN=${PORTAINER_API_TOKEN:-""}
+      - PORTAINER_STACK_NAME=${PORTAINER_STACK_NAME:-""}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
 volumes:

@@ -97,6 +97,8 @@ export default function AdminPage() {
   // Portainer branch state
   const [selectedBranch, setSelectedBranch] = useState('dev');
   const [availableBranches, setAvailableBranches] = useState<string[]>(['stable', 'dev']);
+  const [portainerAvailable, setPortainerAvailable] = useState(false);
+  const [portainerUrl, setPortainerUrl] = useState<string | null>(null);
   const [deployInfo, setDeployInfo] = useState<{
     currentBranch: string;
     pendingBranch?: string;
@@ -268,15 +270,29 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/portainer/branches');
       const data = await res.json();
+      
+      // Check if Portainer is available
+      setPortainerAvailable(data.available === true);
+      setPortainerUrl(data.detectedUrl || null);
+      
+      if (!data.available) {
+        setBranchUpdateStatus(data.error || 'Portainer API not detected');
+        return;
+      }
+      
       if (res.ok) {
         setDeployInfo({
           currentBranch: data.currentBranch || 'stable',
           pendingBranch: data.pendingBranch,
         });
         setAvailableBranches(data.availableBranches || ['stable', 'dev']);
+        setBranchUpdateStatus('');
+      } else {
+        setBranchUpdateStatus(data.error || 'Failed to load branch info');
       }
     } catch (err) {
       console.error('Failed to load branch info:', err);
+      setBranchUpdateStatus('Failed to connect to Portainer');
     }
   };
 
@@ -1073,55 +1089,62 @@ export default function AdminPage() {
               <div className="text-white font-mono">{APP_BRANCH}</div>
             </div>
 
-            {/* Portainer branch management */}
-            <div className="mt-6 p-4 bg-slate-700 rounded-lg">
-              <h3 className="text-white font-semibold mb-3">Deploy Branch</h3>
-              <p className="text-slate-400 text-sm mb-4">
-                Select which branch to deploy. Click "Update" to apply the change.
-              </p>
-              
-              {/* Branch selector */}
-              <div className="flex items-center gap-4 mb-4">
-                <label className="text-slate-400">Branch:</label>
-                <select
-                  value={selectedBranch}
-                  onChange={(e) => handleBranchChange(e.target.value)}
-                  className="bg-slate-600 text-white px-3 py-2 rounded-lg border border-slate-500"
-                >
-                  {availableBranches.map(branch => (
-                    <option key={branch} value={branch}>{branch}</option>
-                  ))}
-                </select>
+            {/* Portainer connection status */}
+            <div className={`mb-4 p-3 rounded-lg ${portainerAvailable ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+              <div className={portainerAvailable ? 'text-emerald-400' : 'text-red-400'}>
+                {portainerAvailable ? `Connected: ${portainerUrl}` : 'Portainer not detected'}
               </div>
-
-              {/* Update button */}
-              <button
-                onClick={updateBranch}
-                disabled={updatingBranch}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                {updatingBranch ? 'Updating...' : 'Update'}
-              </button>
-
-              {branchUpdateStatus && (
-                <div className={`mt-4 p-3 rounded-lg ${branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
-                  <div className={branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'text-emerald-400' : 'text-red-400'}>
-                    {branchUpdateStatus}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Current deploy status */}
-            {deployInfo && (
+            {portainerAvailable && (
+              <div className="mt-6 p-4 bg-slate-700 rounded-lg">
+                <h3 className="text-white font-semibold mb-3">Deploy Branch</h3>
+                <p className="text-slate-400 text-sm mb-4">
+                  Select which branch to deploy. Click "Update" to apply the change.
+                </p>
+                
+                {/* Branch selector */}
+                <div className="flex items-center gap-4 mb-4">
+                  <label className="text-slate-400">Branch:</label>
+                  <select
+                    value={selectedBranch}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    className="bg-slate-600 text-white px-3 py-2 rounded-lg border border-slate-500"
+                  >
+                    {availableBranches.map(branch => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Update button */}
+                <button
+                  onClick={updateBranch}
+                  disabled={updatingBranch}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  {updatingBranch ? 'Updating...' : 'Update'}
+                </button>
+
+                {branchUpdateStatus && (
+                  <div className={`mt-4 p-3 rounded-lg ${branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+                    <div className={branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'text-emerald-400' : 'text-red-400'}>
+                      {branchUpdateStatus}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {portainerAvailable && deployInfo && (
               <div className="mt-6 p-4 bg-slate-700 rounded-lg">
                 <div className="text-slate-400 text-sm">Current Deploy Branch</div>
                 <div className="text-white font-mono text-lg">{deployInfo.currentBranch}</div>
                 {deployInfo.pendingBranch && (
-                  <>
-                    <div className="text-slate-400 text-sm mt-2">Pending Branch</div>
+                  <div className="mt-2">
+                    <div className="text-slate-400 text-sm">Pending Branch</div>
                     <div className="text-yellow-400 font-mono">{deployInfo.pendingBranch}</div>
-                  </>
+                  </div>
                 )}
               </div>
             )}
