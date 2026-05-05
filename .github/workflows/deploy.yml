@@ -1,0 +1,20 @@
+name: Deploy to Portainer
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get short commit
+        id: commit
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Trigger Portainer build
+        run: |
+          curl -X POST ${{ secrets.PORTAINER_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d '{"build_args": {"GIT_COMMIT": "${{ steps.commit.outputs.sha }}"}}'
