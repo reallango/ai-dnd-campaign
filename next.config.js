@@ -6,7 +6,10 @@ let commitHash = process.env.GIT_COMMIT;
 
 if (!commitHash) {
   try {
-    commitHash = execSync("git rev-parse --short HEAD").toString().trim();
+    // Get full SHA first, then take first 7 chars
+    const fullHash = execSync("git rev-parse HEAD").toString().trim();
+    commitHash = fullHash.substring(0, 7);
+    console.log("Git full hash:", fullHash);
   } catch (e) {
     commitHash = "unknown";
   }
@@ -18,7 +21,7 @@ writeFileSync(
   JSON.stringify({ buildHash: commitHash })
 );
 
-console.log("Build hash:", commitHash);
+console.log("Build hash (short):", commitHash);
 
 const nextConfig = {
   env: {

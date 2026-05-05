@@ -1,51 +1,22 @@
 # 1. OBJECTIVE
 
-Fix the commit hash to match the current commit (c5c017b) by copying the `.git` directory to Docker so git can calculate the hash inside the container.
+Fix the commit hash to correctly return the commit SHA (not "docker") by using a more explicit git command.
 
 # 2. CONTEXT SUMMARY
 
-- **Issue**: Docker copies source files but not `.git`, so git can't determine the current commit
-- **Solution**: Copy `.git` directory to the container (or at least the needed parts)
-- **Files**: .dockerignore, Dockerfile
+- **Current issue**: `git rev-parse --short HEAD` returns "docker" which is incorrect
+- **Root cause**: Either the .git is incomplete, or there's a ref named "docker" causing confusion
+- **Fix**: Use `git rev-parse HEAD` (full SHA) then shorten it ourselves
 
 # 3. APPROACH OVERVIEW
 
-Include the `.git` directory in the Docker build so git rev-parse works inside the container:
-1. Update .dockerignore to NOT exclude .git
-2. Keep git installation in Dockerfile
-3. Keep the next.config.js env block approach
+Use the full commit SHA and shorten it manually to ensure we get the actual commit, not a ref name.
 
 # 4. IMPLEMENTATION STEPS
 
-**Step 1: Update .dockerignore**
+**Update next.config.js**
 
-Remove `.git` from the exclusions (or add a line allowing it):
-```
-# Keep .git for git rev-parse during build
-!.git
-```
-
-Or simply remove `.git` from the ignore list entirely.
-
-**Step 2: Verify/Update Dockerfile**
-
-Ensure git is still installed:
-```dockerfile
-FROM node:22
-
-# Install git for commit hash detection
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy full project including .git
-COPY . .
-
-# ... rest of Dockerfile
-```
-
-**Step 3: next.config.js stays as the env block approach**
-
+Replace the git command to get the full SHA first, then shorten:
 ```js
 /** @type {import('next').NextConfig} */
 import { execSync } from "child_process";
@@ -55,7 +26,10 @@ let commitHash = process.env.GIT_COMMIT;
 
 if (!commitHash) {
   try {
-    commitHash = execSync("git rev-parse --short HEAD").toString().trim();
+    // Get full SHA first, then take first 7 chars
+    const fullHash = execSync("git rev-parse HEAD").toString().trim();
+    commitHash = fullHash.substring(0, 7);
+    console.log("Git full hash:", fullHash);
   } catch (e) {
     commitHash = "unknown";
   }
@@ -67,7 +41,7 @@ writeFileSync(
   JSON.stringify({ buildHash: commitHash })
 );
 
-console.log("Build hash:", commitHash);
+console.log("Build hash (short):", commitHash);
 
 const nextConfig = {
   env: {
@@ -80,6 +54,6 @@ export default nextConfig;
 
 # 5. TESTING AND VALIDATION
 
-- Build Docker image (no extra args needed)
-- Curl `http://localhost:3000/api/version` and verify `buildHash` matches `c5c017b`
-- Expected: `{"version":"0.0.1","build":"c5c017b","buildHash":"c5c017b"}`
+- Build Docker image
+- Curl `http://localhost:3000/api/version` - should show the actual commit hash (7 chars)
+- Expected format: `{"version":"0.0.1","build":"c5c017b","buildHash":"c5c017b"}`
