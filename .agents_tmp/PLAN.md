@@ -1,63 +1,85 @@
 # 1. OBJECTIVE
 
-Replace the current webpack-based build hash injection in `next.config.js` with the simpler `env` block method, and ensure git is available in the Docker build environment.
+Fix the commit hash to match the current commit (c5c017b) by copying the `.git` directory to Docker so git can calculate the hash inside the container.
 
 # 2. CONTEXT SUMMARY
 
-- **File**: `/workspace/project/ai-dnd-campaign/next.config.js`
-- **Dockerfile**: Need to add git installation
-- **Issue**: The git rev-parse command fails in Docker because git isn't installed in the container
+- **Issue**: Docker copies source files but not `.git`, so git can't determine the current commit
+- **Solution**: Copy `.git` directory to the container (or at least the needed parts)
+- **Files**: .dockerignore, Dockerfile
 
 # 3. APPROACH OVERVIEW
 
-Two changes:
-1. Install git in the Dockerfile so the git command works inside Docker
-2. Use the `env` block method in next.config.js with error handling
+Include the `.git` directory in the Docker build so git rev-parse works inside the container:
+1. Update .dockerignore to NOT exclude .git
+2. Keep git installation in Dockerfile
+3. Keep the next.config.js env block approach
 
 # 4. IMPLEMENTATION STEPS
 
-**Step 1: Update next.config.js**
+**Step 1: Update .dockerignore**
 
-1. **Add import statement**: Add `import { execSync } from "child_process";` at the very top (after JSDoc)
-
-2. **Add commit hash variable with fallback**: Before the config object:
-   ```js
-   // Try to get from environment first (can be passed via Docker --build-arg)
-   let commitHash = process.env.GIT_COMMIT;
-
-   // Fallback to git rev-parse (works if git is installed)
-   if (!commitHash) {
-     try {
-       commitHash = execSync("git rev-parse --short HEAD").toString().trim();
-     } catch (e) {
-       commitHash = "unknown";
-     }
-   }
-   ```
-
-3. **Replace the config object**:
-   ```js
-   const nextConfig = {
-     env: {
-       NEXT_PUBLIC_BUILD_HASH: commitHash,
-     },
-   };
-   
-   export default nextConfig;
-   ```
-
-**Step 2: Update Dockerfile**
-
-Add git installation before the npm run build step. For Debian-based images (Node.js):
-```dockerfile
-# Install git for commit hash detection
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+Remove `.git` from the exclusions (or add a line allowing it):
+```
+# Keep .git for git rev-parse during build
+!.git
 ```
 
-Add this right after the base image and before the npm install step.
+Or simply remove `.git` from the ignore list entirely.
+
+**Step 2: Verify/Update Dockerfile**
+
+Ensure git is still installed:
+```dockerfile
+FROM node:22
+
+# Install git for commit hash detection
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy full project including .git
+COPY . .
+
+# ... rest of Dockerfile
+```
+
+**Step 3: next.config.js stays as the env block approach**
+
+```js
+/** @type {import('next').NextConfig} */
+import { execSync } from "child_process";
+import { writeFileSync } from "fs";
+
+let commitHash = process.env.GIT_COMMIT;
+
+if (!commitHash) {
+  try {
+    commitHash = execSync("git rev-parse --short HEAD").toString().trim();
+  } catch (e) {
+    commitHash = "unknown";
+  }
+}
+
+// Write to build-info.json for the API endpoint
+writeFileSync(
+  "./build-info.json",
+  JSON.stringify({ buildHash: commitHash })
+);
+
+console.log("Build hash:", commitHash);
+
+const nextConfig = {
+  env: {
+    NEXT_PUBLIC_BUILD_HASH: commitHash,
+  },
+};
+
+export default nextConfig;
+```
 
 # 5. TESTING AND VALIDATION
 
-- Run Docker build and verify it completes without git errors
-- Check that the commit hash is in the bundle (search in `.next/` for the hash)
-- The value should be the actual git commit short hash (e.g., "abc123")
+- Build Docker image (no extra args needed)
+- Curl `http://localhost:3000/api/version` and verify `buildHash` matches `c5c017b`
+- Expected: `{"version":"0.0.1","build":"c5c017b","buildHash":"c5c017b"}`
