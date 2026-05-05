@@ -1,8 +1,10 @@
 {
   "name": "temp_init",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
+    "prebuild": "echo \"export const BUILD_HASH = '$(git rev-parse --short HEAD)';\" > src/buildInfo.ts",
+    "postinstall": "if [ ! -f src/buildInfo.ts ]; then npm run prebuild; fi",
     "dev": "next dev",
     "build": "NEXT_PUBLIC_BUILD_HASH=$(git rev-parse --short HEAD) next build",
     "start": "next start",
