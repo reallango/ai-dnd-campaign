@@ -1,62 +1,126 @@
 # 1. OBJECTIVE
 
-Consolidate the updates and portainer pages into tabs on the main admin page, pulling version/build info from the API.
+Fix portainer detection to try HTTPS on port 9443 and handle self-signed SSL certificates in the code (not as env variable).
 
 # 2. CONTEXT SUMMARY
 
-Current state:- `/app/admin/page.tsx` - main admin page with some tabs (settings, users, tokens, email, updates)
-- `/app/admin/updates/page.tsx` - separate page (not used)
-- `/app/admin/portainer/page.tsx` - separate page (not used)Both separate pages aren't linked/used. User wants them as tabs on main admin page.
+Current detection:
+- Uses HTTP only (not HTTPS)
+- Uses port 9000 (not 9443)
+- Doesn't handle self-signed certs
+
+User confirmed: `https://host.docker.internal:9443` works, but has a self-signed cert.
 
 # 3. APPROACH OVERVIEW
 
-1. Add Portainer as a new tab on admin page
-2. Move version/build display from the updates page to the updates tab  
-3. Fetch actual build hash from `/api/version` API
+Update the detection code to:
+1. Add HTTPS URLs with port 9443 to fallback list
+2. Handle self-signed certs in the fetch call itself (show warning, but still use it)
 
 # 4. IMPLEMENTATION STEPS
 
-**In `/app/admin/page.tsx`:**
+**In `/lib/portainerDiscovery.ts`:**
 
-1. **Add Portainer tab to the tabs list:**
-```tsx
-const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer'>('settings');
+Update FALLBACK_URLS and handle TLS:
+```ts
+const FALLBACK_URLS = [
+  // HTTP options
+  'http://portainer:9000',
+  'http://host.docker.internal:9000',
+  // HTTPS options (user confirmed this works)
+  'https://host.docker.internal:9443',
+  'https://portainer:9443',
+];
+
+// Helper to fetch with TLS handling
+async function fetchWithTLS(url: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    // Try normal fetch first
+    return await fetch(url, options);
+  } catch (certError) {
+    // If it's a TLS/SSL cert error with HTTPS, try with Node's rejectUnauthorized: false
+    if (url.startsWith('https://')) {
+      const { fetch: nodeFetch } = await import('node:http');
+      // Use Node's https module with rejectUnauthorized: false
+      const https = await import('node:https');
+      
+      return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const req = https.request({
+          hostname: urlObj.hostname,
+          port: urlObj.port || 443,
+          path: urlObj.pathname + urlObj.search,
+          method: 'GET',
+          rejectUnauthorized: false, // Accept self-signed certs
+          headers: options.headers || {},
+        }, (res) => {
+          resolve(Response);
+        });
+        req.on('error', reject);
+        req.end();
+      });
+    }
+    throw certError;
+  }
+}
 ```
 
-2. **Add state to fetch build hash:**
-```tsx
-const [buildInfo, setBuildInfo] = useState<{version: string; build: string; buildHash: string} | null>(null);
+Actually, simpler approach - just use Node's built-in https with the option:
 
-useEffect(() => {
-  fetch('/api/version')
-    .then(r => r.json())
-    .then(data => setBuildInfo(data))
-    .catch(() => setBuildInfo(null));
-}, []);
+```ts
+const FALLBACK_URLS = [
+  'http://portainer:9000',
+  'http://host.docker.internal:9000',
+  'https://host.docker.internal:9443',
+  'https://portainer:9443',
+];
+
+// Modified fetch that accepts self-signed certs
+async function fetchPortainer(url: string, apiKey: string): Promise<Response> {
+  const https = await import('node:https');
+  
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: '/api/system/status',
+      method: 'GET',
+      rejectUnauthorized: false, // Accept self-signed certs
+      headers: { 'X-Api-Key': apiKey },
+    };
+    
+    const req = https.request(options, (res) => {
+      // Convert Node response to Fetch API response-like object
+      resolve({
+        ok: res.statusCode === 200,
+        status: res.statusCode,
+        json: async () => {
+          return new Promise((resolve) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+              try {
+                resolve(JSON.parse(body));
+              } catch {
+                resolve({});
+              }
+            });
+          });
+        },
+      });
+    });
+    
+    req.on('error', reject);
+    req.end();
+  });
+}
 ```
 
-3. **Update the Updates tab to show API data:**
-```tsx
-<div className="mb-6 p-4 bg-slate-700 rounded-lg">
-  <div className="text-slate-400 text-sm mb-1">App Version</div>
-  <div className="text-white text-lg font-mono">{buildInfo?.version || 'unknown'}</div>
-  <div className="text-slate-400 text-sm mt-2">Build</div>
-  <div className="text-white font-mono">{buildInfo?.build || buildInfo?.buildHash || 'unknown'}</div>
-</div>
-```
-
-4. **Add content to Portainer tab** (move from app/admin/portainer/page.tsx):
-- Include the Portainer branch selection and deploy functionality
-- Show current deploy status
-
-5. **Remove the now-unused separate pages** (optional - can delete):
-- `app/admin/updates/page.tsx`
-- `app/admin/portainer/page.tsx`
-
-Also ensure the API route has `export const dynamic = 'force-dynamic'` so it runs at runtime.
+The key is `rejectUnauthorized: false` - this tells Node.js to accept self-signed certificates while still making the connection. It will show a warning in the logs but will still work.
 
 # 5. TESTING AND VALIDATION
 
 - Rebuild and deploy
-- Check admin page has new "Updates" and "Portainer" tabs
-- Each tab displays correct information from API
+- Test portainer detection
+- Should find Portainer and show a certificate warning in logs
