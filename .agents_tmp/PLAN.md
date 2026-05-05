@@ -1,26 +1,51 @@
 # 1. OBJECTIVE
 
-Fix the commit hash by fetching it from the GitHub remote during the Docker build, since `.git` isn't available in the build context.
+Fix the commit hash by:
+1. Removing the broken COPY .git from Dockerfile  
+2. Fetching commit from GitHub using git ls-remote in next.config.js
 
 # 2. CONTEXT SUMMARY
 
-- **Issue**: Docker builds from GitHub repo, not local filesystem - no `.git` directory available
-- **Solution**: Fetch the current commit hash using `git ls-remote` or GitHub API during build
+- **Issue 1**: Dockerfile has `COPY .git ./.git` that fails because `.git` doesn't exist in GitHub build context
+- **Issue 2**: Need to fetch commit hash from GitHub instead of local git
 
 # 3. APPROACH OVERVIEW
 
-Two options:
-
-**Option A** (simpler): Use `git ls-remote` to get the current commit from the origin remote
-- Requires git to be installed (already there)
-- Fetches from GitHub to get current HEAD commit
-
-**Option B**: Use GitHub API with a token
-- More reliable but requires token
+Remove the broken COPY line and use git ls-remote to fetch the commit.
 
 # 4. IMPLEMENTATION STEPS
 
-**Update next.config.js to fetch from remote**
+**Step 1: Fix Dockerfile - remove the COPY .git line**
+
+Remove this from Dockerfile:
+```dockerfile
+# Explicitly copy .git directory
+COPY .git ./.git
+```
+
+The Dockerfile should be:
+```dockerfile
+FROM node:22
+
+# Install git for commit hash detection
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY . .
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
+
+# Build the application
+RUN npm run build
+
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+**Step 2: Update next.config.js to use git ls-remote**
 
 ```js
 /** @type {import('next').NextConfig} */
@@ -66,10 +91,8 @@ const nextConfig = {
 export default nextConfig;
 ```
 
-The `git ls-remote` command connects to GitHub and gets the current HEAD commit SHA without needing `.git` locally.
-
 # 5. TESTING AND VALIDATION
 
 - Build Docker image
-- Verify build log shows commit hash from GitHub
-- Curl `http://localhost:3000/api/version` - should show actual commit hash
+- Verify build log shows commit hash from GitHub (should show 860c143 from the log)
+- Curl `http://localhost:3000/api/version` - should show `860c143`
