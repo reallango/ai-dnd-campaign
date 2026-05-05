@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface PortainerStatus {
   ok: boolean;
@@ -23,6 +26,7 @@ interface StackInfo {
 }
 
 export default function PortainerPage() {
+  const { data: version } = useSWR('/api/version', fetcher);
   const [status, setStatus] = useState<PortainerStatus | null>(null);
   const [stack, setStack] = useState<StackInfo | null>(null);
   const [branch, setBranch] = useState('');
@@ -90,6 +94,12 @@ export default function PortainerPage() {
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Portainer Integration</h1>
+
+        {version && (
+          <div className="text-sm text-gray-400 mb-2">
+            Running build {version.build}
+          </div>
+        )}
 
         {/* Status Section */}
         <div className="mb-6 p-4 bg-slate-800 rounded-lg">
