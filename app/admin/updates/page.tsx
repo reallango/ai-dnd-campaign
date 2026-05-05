@@ -15,6 +15,10 @@ export default function UpdatesPage() {
         <div className="text-lg font-semibold">
           v{version?.version ?? '0.0.0'} • build {version?.build ?? 'unknown'}
         </div>
+
+        <p className="text-gray-300">Branch: {version?.branch ?? 'main'}</p>
+        <p className="text-gray-300">Portainer: {version?.portainerDetected ? 'Yes' : 'No'}</p>
+        <p className="text-gray-300">Build: {version?.buildHash}</p>
       </div>
     </div>
   );
