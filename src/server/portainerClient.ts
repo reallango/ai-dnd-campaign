@@ -127,8 +127,9 @@ function getAuthHeaders(): Record<string, string> {
   if (!token) {
     throw new Error('PORTAINER_API_TOKEN not configured');
   }
+  // Use X-Api-Key header (for API access tokens), not Bearer
   return {
-    'Authorization': `Bearer ${token}`,
+    'X-Api-Key': token,
   };
 }
 

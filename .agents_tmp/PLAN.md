@@ -1,61 +1,50 @@
 # 1. OBJECTIVE
 
-Fix portainer stack detection to use https.request instead of fetch in the client code.
+Fix portainer API authentication header from "Authorization: Bearer" to "X-Api-Key".
 
 # 2. CONTEXT SUMMARY
 
-The detection works now:
-- Status: `curl /api/portainer/status` returns `{ok: true, reachable: true, apiUrl: "https://host.docker.internal:9443"}`
-- But stack API returns `{error: "fetch failed"}`
+Working test:
+```bash
+curl -k https://host.docker.internal:9443/api/stacks \
+  -H "X-Api-Key: ptr_EqnRFh..."
+```
 
-Manual test proves `https.request` works but `fetch` doesn't in Node 22.
+Code uses:
+```ts
+'Authorization': `Bearer ${token}`
+```
 
-The files that need fixing:
-- `/src/server/portainerDiscovery.ts` - already fixed
-- `/src/server/portainerClient.ts` - still uses fetch, needs fixing
+These two formats work differently:
+- `Authorization: Bearer` - requires JWT token (doesn't work)
+- `X-Api-Key` - requires API access token (DOES work)
 
 # 3. APPROACH OVERVIEW
 
-Update `/src/server/portainerClient.ts` to use `https.request` instead of `fetch` for all Portainer API calls.
+Change the auth header in `/src/server/portainerClient.ts` from `Authorization: Bearer` to `X-Api-Key`.
 
 # 4. IMPLEMENTATION STEPS
 
 **In `/src/server/portainerClient.ts`:**
 
-Replace all `fetch` calls with `https.request` (for HTTPS) or `http.request` (for HTTP).
+Update `getAuthHeaders()`:
 
-Example change:
 ```ts
-// Old (doesn't work):
-const response = await fetch(`${baseUrl}/api/stacks`, {
-  headers: getAuthHeaders(),
-  agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
-} as any);
-
-// New (works):
-const client = baseUrl.startsWith('https://') ? https : http;
-const result = await new Promise((resolve, reject) => {
-  const urlObj = new URL(baseUrl);
-  const req = client.request({
-    hostname: urlObj.hostname,
-    port: urlObj.port || 443,
-    path: '/api/stacks',
-    method: 'GET',
-    rejectUnauthorized: false,
-    headers: getAuthHeaders(),
-  }, (res) => {
-    let body = '';
-    res.on('data', chunk => body += chunk);
-    res.on('end', () => resolve(JSON.parse(body)));
-  });
-  req.on('error', reject);
-  req.end();
-});
+function getAuthHeaders(): Record<string, string> {
+  const token = process.env.PORTAINER_API_TOKEN;
+  if (!token) {
+    throw new Error('PORTAINER_API_TOKEN not configured');
+  }
+  // Use X-Api-Key header (for API access tokens), not Bearer
+  return {
+    'X-Api-Key': token,
+  };
+}
 ```
 
-Apply this fix to all fetch calls in the file.
+Also update discovery if it uses Bearer.
 
 # 5. TESTING AND VALIDATION
 
 - Test: curl http://localhost:3000/api/portainer/stack
-- Should return stack info with Id: 39, Name: "gm"
+- Should return: {ok: true, id: 39, name: "gm"}
