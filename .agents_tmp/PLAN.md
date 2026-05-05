@@ -1,34 +1,52 @@
 # 1. OBJECTIVE
 
-Fix the commit hash by ensuring `.git` directory is copied to the Docker container.
+Fix the commit hash by copying `.git` directory explicitly in the Dockerfile.
 
 # 2. CONTEXT SUMMARY
 
-- **Current issue**: Docker excludes `.git` by default from the build context
-- **Solution**: Explicitly tell Docker to include `.git` in .dockerignore
+- **Issue**: Docker's negation pattern `!.git` in .dockerignore doesn't work
+- **Solution**: Use a separate COPY command in Dockerfile for .git
 
 # 3. APPROACH OVERVIEW
 
-Add `!.git` to .dockerignore to explicitly include the .git directory (overriding Docker's default exclusion).
+Copy `.git` explicitly in the Dockerfile after the main project copy.
 
 # 4. IMPLEMENTATION STEPS
 
-**Update .dockerignore**
+**Update Dockerfile**
 
-Add at the end:
+After the main COPY, add another COPY for .git:
+```dockerfile
+FROM node:22
+
+# Install git for commit hash detection
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy full project (excluding .git by default)
+COPY . .
+
+# Explicitly copy .git directory
+COPY .git ./.git
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
+
+# Build the application
+RUN npm run build
+
+EXPOSE 3000
+CMD ["npm", "start"]
 ```
-# Explicitly include .git for commit hash detection during build
-!.git
-```
 
-This overrides Docker's default behavior of excluding `.git`.
+**Also remove negation from .dockerignore (clean up)**
 
-**Verify next.config.js**
-
-The current code using `git rev-parse HEAD` should work once .git is copied.
+The `!.git` line isn't needed in .dockerignore.
 
 # 5. TESTING AND VALIDATION
 
 - Build Docker image
-- Verify build log shows commit hash (not "unknown")
+- Verify build log shows commit hash
 - Curl `http://localhost:3000/api/version` - should show actual commit hash

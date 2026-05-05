@@ -5,8 +5,11 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy full project first so src/ exists before npm install
+# Copy full project (excluding .git by default)
 COPY . .
+
+# Explicitly copy .git directory
+COPY .git ./.git
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.npm \
