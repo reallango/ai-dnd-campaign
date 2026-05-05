@@ -1,42 +1,61 @@
 # 1. OBJECTIVE
 
-Two tasks:
-1. Fix portainer detection to use https.request instead of fetch
-2. Add editable URL input in admin UI
+Fix portainer stack detection to use https.request instead of fetch in the client code.
 
-# 2. TASK 1: FIX DETECTION CODE
+# 2. CONTEXT SUMMARY
 
-Replace fetch with https.request in `/src/server/portainerDiscovery.ts`:
+The detection works now:
+- Status: `curl /api/portainer/status` returns `{ok: true, reachable: true, apiUrl: "https://host.docker.internal:9443"}`
+- But stack API returns `{error: "fetch failed"}`
 
-Replace the existing fetch call with the working https.request pattern.
+Manual test proves `https.request` works but `fetch` doesn't in Node 22.
 
-# 3. TASK 2: ADMIN UI FOR URL
+The files that need fixing:
+- `/src/server/portainerDiscovery.ts` - already fixed
+- `/src/server/portainerClient.ts` - still uses fetch, needs fixing
 
-Add editable Portainer URL field to admin page:
-- Input field (pre-filled with saved URL or empty)
-- Test button (tests entered URL, or defaults if blank)
-- Save button (saves successful URL)
+# 3. APPROACH OVERVIEW
 
-The app may already have a settings table - check existing schema first.
+Update `/src/server/portainerClient.ts` to use `https.request` instead of `fetch` for all Portainer API calls.
 
 # 4. IMPLEMENTATION STEPS
 
-**Task 1: Fix detection**
+**In `/src/server/portainerClient.ts`:**
 
-Update `/src/server/portainerDiscovery.ts` to use https.request/http.request directly.
+Replace all `fetch` calls with `https.request` (for HTTPS) or `http.request` (for HTTP).
 
-**Task 2: Add UI**
+Example change:
+```ts
+// Old (doesn't work):
+const response = await fetch(`${baseUrl}/api/stacks`, {
+  headers: getAuthHeaders(),
+  agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
+} as any);
 
-Add to admin page Portainer tab:
-- Input: `<input value={portainerUrl} onChange={setPortainerUrl} placeholder="https://host.docker.internal:9443" />`
-- Test button: calls test endpoint
-- Save button: calls save endpoint
+// New (works):
+const client = baseUrl.startsWith('https://') ? https : http;
+const result = await new Promise((resolve, reject) => {
+  const urlObj = new URL(baseUrl);
+  const req = client.request({
+    hostname: urlObj.hostname,
+    port: urlObj.port || 443,
+    path: '/api/stacks',
+    method: 'GET',
+    rejectUnauthorized: false,
+    headers: getAuthHeaders(),
+  }, (res) => {
+    let body = '';
+    res.on('data', chunk => body += chunk);
+    res.on('end', () => resolve(JSON.parse(body)));
+  });
+  req.on('error', reject);
+  req.end();
+});
+```
 
-**API endpoints needed:**
-
-- GET/POST /api/admin/settings (check if exists, or reuse)
+Apply this fix to all fetch calls in the file.
 
 # 5. TESTING AND VALIDATION
 
-- Test detection manually first
-- Then test UI buttons
+- Test: curl http://localhost:3000/api/portainer/stack
+- Should return stack info with Id: 39, Name: "gm"

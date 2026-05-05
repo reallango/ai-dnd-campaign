@@ -2,11 +2,8 @@
 // Provides typed wrappers for Portainer API operations
 
 import https from 'https';
+import http from 'http';
 import { detectPortainerApiUrl, getPortainerUrl } from './portainerDiscovery';
-
-const insecureAgent = new https.Agent({
-  rejectUnauthorized: false,
-});
 
 // Types
 export interface Stack {
@@ -44,6 +41,45 @@ export interface StackFound {
 }
 
 export type StackResult = StackFound | StackError;
+
+/**
+ * HTTP request helper for Portainer API
+ */
+function portainerRequest<T>(url: string, options: {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+} = {}): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const isHTTPS = url.startsWith('https://');
+    const urlObj = new URL(url);
+    const client = isHTTPS ? https : http;
+    
+    const req = client.request({
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHTTPS ? 443 : 80),
+      path: urlObj.pathname,
+      method: options.method || 'GET',
+      rejectUnauthorized: false, // Accept self-signed certs
+      headers: options.headers as Record<string, string>,
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(body) as T);
+        } catch {
+          reject(new Error('Invalid JSON response'));
+        }
+      });
+    });
+    req.on('error', reject);
+    if (options.body) {
+      req.write(options.body);
+    }
+    req.end();
+  });
+}
 
 /**
  * Normalize Git URL for comparison:
@@ -86,7 +122,7 @@ export async function getPortainerBaseUrl(): Promise<string> {
 /**
  * Get auth headers for Portainer API
  */
-function getAuthHeaders(): HeadersInit {
+function getAuthHeaders(): Record<string, string> {
   const token = process.env.PORTAINER_API_TOKEN;
   if (!token) {
     throw new Error('PORTAINER_API_TOKEN not configured');
@@ -101,16 +137,9 @@ function getAuthHeaders(): HeadersInit {
  */
 export async function getStacks(): Promise<Stack[]> {
   const baseUrl = await detectPortainerApiUrl();
-  const response = await fetch(`${baseUrl}/api/stacks`, {
+  return portainerRequest<Stack[]>(`${baseUrl}/api/stacks`, {
     headers: getAuthHeaders(),
-    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
-  } as any);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch stacks: ${response.statusText}`);
-  }
-  
-  return response.json() as Promise<Stack[]>;
+  });
 }
 
 /**
@@ -118,19 +147,13 @@ export async function getStacks(): Promise<Stack[]> {
  */
 export async function getStackById(id: number): Promise<Stack | null> {
   const baseUrl = await detectPortainerApiUrl();
-  const response = await fetch(`${baseUrl}/api/stacks/${id}`, {
-    headers: getAuthHeaders(),
-    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
-  } as any);
-  
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw new Error(`Failed to fetch stack: ${response.statusText}`);
+  try {
+    return await portainerRequest<Stack>(`${baseUrl}/api/stacks/${id}`, {
+      headers: getAuthHeaders(),
+    });
+  } catch {
+    return null;
   }
-  
-  return response.json() as Promise<Stack>;
 }
 
 /**
@@ -146,31 +169,21 @@ export async function getStackByName(name: string): Promise<Stack | null> {
  */
 export async function getWebhooksForStack(stackId: number): Promise<Webhook[]> {
   const baseUrl = await detectPortainerApiUrl();
-  const response = await fetch(`${baseUrl}/api/stacks/${stackId}/webhooks`, {
-    headers: getAuthHeaders(),
-    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
-  } as any);
-  
-  if (!response.ok) {
+  try {
+    return await portainerRequest<Webhook[]>(`${baseUrl}/api/stacks/${stackId}/webhooks`, {
+      headers: getAuthHeaders(),
+    });
+  } catch {
     // Some Portainer versions don't have this endpoint
     return [];
   }
-  
-  return response.json() as Promise<Webhook[]>;
 }
 
 /**
  * Trigger stack update via webhook URL
  */
 export async function triggerWebhookUpdate(webhookUrl: string): Promise<void> {
-  const response = await fetch(webhookUrl, {
-    method: 'POST',
-    agent: webhookUrl.startsWith('https://') ? insecureAgent : undefined,
-  } as any);
-  
-  if (!response.ok) {
-    throw new Error(`Webhook failed: ${response.statusText}`);
-  }
+  await portainerRequest<any>(webhookUrl, { method: 'POST' });
 }
 
 /**
@@ -181,31 +194,28 @@ export async function triggerStackUpdate(stackId: number, branch: string): Promi
   const baseUrl = await detectPortainerApiUrl();
   
   // First, try to update the stack's git reference
-  const updateResponse = await fetch(`${baseUrl}/api/stacks/${stackId}`, {
-    method: 'PUT',
-    headers: {
-      ...getAuthHeaders(),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      RepositoryReferenceName: branch,
-    }),
-    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
-  } as any);
-  
-  if (!updateResponse.ok) {
-    const error = await updateResponse.text();
-    throw new Error(`Failed to update stack: ${error}`);
+  try {
+    await portainerRequest<any>(`${baseUrl}/api/stacks/${stackId}`, {
+      method: 'PUT',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        RepositoryReferenceName: branch,
+      }),
+    });
+  } catch (e) {
+    throw new Error(`Failed to update stack: ${e}`);
   }
   
   // Then trigger a redeploy
-  const redeployResponse = await fetch(`${baseUrl}/api/stacks/${stackId}/upstack`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
-  } as any);
-  
-  if (!redeployResponse.ok) {
+  try {
+    await portainerRequest<any>(`${baseUrl}/api/stacks/${stackId}/upstack`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+  } catch {
     console.warn('Stack updated but redeploy may have failed');
   }
 }
