@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: "{{ .Env.GIT_COMMIT }}"
     image: ai-dnd-campaign:latest
     container_name: ai-dnd-campaign
     ports:
