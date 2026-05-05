@@ -1,5 +1,8 @@
 FROM node:22
 
+# Install git for commit hash detection
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy full project first so src/ exists before npm install
