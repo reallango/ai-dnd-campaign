@@ -5,6 +5,20 @@ interface PortainerStatus {
   Version: string;
 }
 
+interface PortainerUrlSuccess {
+  ok: true;
+  url: string;
+}
+
+interface PortainerUrlError {
+  ok: false;
+  error: string;
+  tried: string[];
+  missingEnv: string[];
+}
+
+export type PortainerUrlResult = PortainerUrlSuccess | PortainerUrlError;
+
 const CANDIDATE_URLS = [
   'http://portainer:9000',
   'http://host.docker.internal:9000',
@@ -34,7 +48,69 @@ function buildCandidates(): string[] {
 
 /**
  * Detect Portainer API URL by probing candidates
+ * Returns structured result instead of throwing
+ */
+export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlResult> {
+  // Return cached if already detected
+  if (cachedBaseUrl) {
+    return { ok: true, url: cachedBaseUrl };
+  }
+  
+  const token = process.env.PORTAINER_API_TOKEN;
+  
+  // If token missing
+  if (!token) {
+    return {
+      ok: false,
+      error: 'Missing Portainer API token',
+      tried: [],
+      missingEnv: ['PORTAINER_API_TOKEN'],
+    };
+  }
+  
+  const candidates = buildCandidates();
+  const tried: string[] = [];
+  
+  for (const candidate of candidates) {
+    tried.push(candidate);
+    try {
+      const response = await fetch(`${candidate}/api/system/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json() as PortainerStatus;
+        if (data && data.Version) {
+          cachedBaseUrl = candidate;
+          console.log(`[Portainer] Detected at: ${candidate}`);
+          return { ok: true, url: candidate };
+        }
+      }
+    } catch {
+      console.log(`[Portainer] Not reachable: ${candidate}`);
+    }
+  }
+  
+  // All candidates failed
+  return {
+    ok: false,
+    error: 'Unable to detect Portainer API URL',
+    tried: [
+      process.env.PORTAINER_API_URL ? process.env.PORTAINER_API_URL : 'PORTAINER_API_URL (empty)',
+      'http://portainer:9000/api',
+      'http://host.docker.internal:9000/api',
+    ],
+    missingEnv: ['PORTAINER_API_URL'],
+  };
+}
+
+/**
+ * Detect Portainer API URL by probing candidates
  * Uses Bearer token auth - throws if no candidates work
+ * @deprecated Use detectPortainerApiUrlWithStatus() instead for structured errors
  */
 export async function detectPortainerApiUrl(): Promise<string> {
   // Return cached if already detected
@@ -59,7 +135,6 @@ export async function detectPortainerApiUrl(): Promise<string> {
       });
       
       if (response.ok) {
-        // Verify we get valid JSON
         const data = await response.json() as PortainerStatus;
         if (data && data.Version) {
           cachedBaseUrl = candidate;
@@ -68,7 +143,6 @@ export async function detectPortainerApiUrl(): Promise<string> {
         }
       }
     } catch {
-      // Try next candidate
       console.log(`[Portainer] Not reachable: ${candidate}`);
     }
   }

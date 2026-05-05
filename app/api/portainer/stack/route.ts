@@ -1,32 +1,33 @@
 import { NextResponse } from 'next/server';
 import { detectPortainerApiUrl } from '@/src/server/portainerDiscovery';
-import { findTargetStack, getWebhooksForStack } from '@/src/server/portainerClient';
+import { findTargetStack, StackResult, StackFound, StackError } from '@/src/server/portainerClient';
 
 // GET /api/portainer/stack - Returns target stack info
 export async function GET() {
   try {
-    // Ensure we can reach Portainer
+    // Validate API URL detection first
     await detectPortainerApiUrl();
     
     // Find the target stack
-    const stack = await findTargetStack();
+    const result = await findTargetStack();
     
-    if (!stack) {
-      return NextResponse.json(
-        { error: 'Stack not found. Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME.' },
-        { status: 404 }
-      );
+    if (!result.ok) {
+      // Return structured error
+      return NextResponse.json({
+        ok: false,
+        error: result.error,
+        missingEnv: result.missingEnv,
+      });
     }
     
-    // Get webhooks for this stack
-    const webhooks = await getWebhooksForStack(stack.Id);
-    
+    // Success - return stack info
     return NextResponse.json({
-      id: stack.Id,
-      name: stack.Name,
-      webhooks: stack.AutoUpdate?.Webhook ? [stack.AutoUpdate.Webhook] : [],
-      repositoryUrl: stack.RepositoryURL,
-      branch: stack.RepositoryReferenceName,
+      ok: true,
+      id: result.id,
+      name: result.name,
+      repoUrl: result.repoUrl,
+      branch: result.branch,
+      webhooks: result.webhooks,
     });
   } catch (error) {
     return NextResponse.json(

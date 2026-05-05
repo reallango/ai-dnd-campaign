@@ -1,22 +1,25 @@
 import { NextResponse } from 'next/server';
-import { detectPortainerApiUrl, isPortainerAvailable, getPortainerUrl } from '@/src/server/portainerDiscovery';
+import { detectPortainerApiUrlWithStatus, getPortainerUrl } from '@/src/server/portainerDiscovery';
 
-// GET /api/portainer/status - Returns Portainer connectivity status
+// GET /api/portainer/status - Returns Portainer connectivity status with structured errors
 export async function GET() {
-  try {
-    // Try to detect/determine URL
-    const apiUrl = await detectPortainerApiUrl();
-    
+  const result = await detectPortainerApiUrlWithStatus();
+  
+  if (result.ok) {
     return NextResponse.json({
+      ok: true,
       reachable: true,
-      apiUrl,
+      apiUrl: result.url,
       error: null,
-    });
-  } catch (error) {
-    return NextResponse.json({
-      reachable: false,
-      apiUrl: getPortainerUrl(),
-      error: error instanceof Error ? error.message : 'Unable to connect to Portainer',
+      missingEnv: null,
     });
   }
+  
+  return NextResponse.json({
+    ok: false,
+    reachable: false,
+    apiUrl: getPortainerUrl(),
+    error: result.error,
+    missingEnv: result.missingEnv,
+  });
 }

@@ -3,18 +3,22 @@
 import { useState, useEffect } from 'react';
 
 interface PortainerStatus {
+  ok: boolean;
   reachable: boolean;
   apiUrl: string | null;
   error: string | null;
+  missingEnv: string[] | null;
 }
 
 interface StackInfo {
+  ok: boolean;
   id?: number;
   name?: string;
-  webhooks?: string[];
-  repositoryUrl?: string;
+  repoUrl?: string;
   branch?: string;
+  webhooks?: string[];
   error?: string;
+  missingEnv?: string[];
 }
 
 export default function PortainerPage() {
@@ -24,7 +28,7 @@ export default function PortainerPage() {
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const canUpdate = status?.reachable && stack?.name && branch.trim() && !updating;
+  const canUpdate = status?.ok && stack?.ok && stack.name && branch.trim() && !updating;
 
   useEffect(() => {
     loadData();
@@ -42,6 +46,8 @@ export default function PortainerPage() {
         const stackRes = await fetch('/api/portainer/stack');
         const stackData = await stackRes.json();
         setStack(stackData);
+      } else {
+        setStack(null);
       }
     } catch (err) {
       console.error('Failed to load Portainer data:', err);
@@ -75,10 +81,45 @@ export default function PortainerPage() {
     }
   };
 
+  // Determine error states
+  const tokenMissing = status?.missingEnv?.includes('PORTAINER_API_TOKEN') ?? false;
+  const apiUrlMissing = !status?.reachable && status?.error?.includes('Unable to detect');
+  const stackNotFound = status?.reachable && stack && !stack.ok && stack.error?.includes('not found');
+  const stackMultiple = status?.reachable && stack && !stack.ok && stack.error?.includes('Multiple');
+
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Portainer Integration</h1>
+
+        {/* Error Messages */}
+        {tokenMissing && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
+            <p className="text-red-400 font-semibold">Missing Portainer API token</p>
+            <p className="text-red-300 text-sm mt-1">Set environment variable: PORTAINER_API_TOKEN</p>
+          </div>
+        )}
+
+        {apiUrlMissing && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
+            <p className="text-red-400 font-semibold">Unable to detect Portainer API URL</p>
+            <p className="text-red-300 text-sm mt-1">Set PORTAINER_API_URL or fix network connectivity.</p>
+          </div>
+        )}
+
+        {stackNotFound && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
+            <p className="text-red-400 font-semibold">Unable to auto-detect stack</p>
+            <p className="text-red-300 text-sm mt-1">Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME.</p>
+          </div>
+        )}
+
+        {stackMultiple && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-600 rounded-lg">
+            <p className="text-red-400 font-semibold">Multiple stacks match this repo</p>
+            <p className="text-red-300 text-sm mt-1">Set PORTAINER_STACK_ID or PORTAINER_STACK_NAME to disambiguate.</p>
+          </div>
+        )}
 
         {/* Status Section */}
         <div className="mb-6 p-4 bg-slate-800 rounded-lg">
@@ -111,17 +152,24 @@ export default function PortainerPage() {
           
           {!status?.reachable ? (
             <div className="text-slate-400">Portainer not reachable</div>
-          ) : stack?.name ? (
+          ) : stack?.ok && stack.name ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-slate-400">Name:</span>
                 <span>{stack.name}</span>
               </div>
               
-              {stack.id && (
+              {stack.id !== undefined && (
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">ID:</span>
                   <code className="text-sm">{stack.id}</code>
+                </div>
+              )}
+              
+              {stack.repoUrl && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Repo URL:</span>
+                  <code className="text-sm">{stack.repoUrl}</code>
                 </div>
               )}
               
