@@ -14,6 +14,11 @@ jobs:
       - name: Write commit hash
         run: echo "GIT_COMMIT=${GITHUB_SHA::7}" > .env.build
 
+      - name: Build Docker image with commit hash
+        run: docker build \
+          --build-arg GIT_COMMIT=${GITHUB_SHA::7} \
+          -t ai-dnd-campaign:latest .
+
       - name: Commit and push updated hash
         run: |
           git config user.name "github-actions"
