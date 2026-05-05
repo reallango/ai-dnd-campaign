@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config) => {
-    // Use shell command at webpack time to get git hash
     const { execSync } = require("child_process");
     let shortCommit = "docker";
     try {
@@ -9,6 +8,14 @@ const nextConfig = {
     } catch (e) {
       // git not available, use default
     }
+    
+    // Write to file for server-side access
+    require("fs").writeFileSync(
+      "./build-info.json",
+      JSON.stringify({ buildHash: shortCommit })
+    );
+    
+    // Also inject for client-side
     config.plugins.push(
       new (require("webpack").DefinePlugin)({
         "process.env.NEXT_PUBLIC_BUILD_HASH": JSON.stringify(shortCommit)
