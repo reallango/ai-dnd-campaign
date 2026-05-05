@@ -106,7 +106,7 @@ export default function AdminPage() {
   } | null>(null);
   const [updatingBranch, setUpdatingBranch] = useState(false);
   const [branchUpdateStatus, setBranchUpdateStatus] = useState('');
-  const [portainerStatus, setPortainerStatus] = useState<{ok: boolean; reachable: boolean; apiUrl: string | null; error: string | null; missingEnv: string[] | null} | null>(null);
+  const [portainerStatus, setPortainerStatus] = useState<{ok: boolean; reachable: boolean; apiUrl: string | null; error: string | null; missingEnv: string[] | null; tried: string[] | null} | null>(null);
   const [portainerStack, setPortainerStack] = useState<{ok: boolean; id?: number; name?: string; repoUrl?: string; branch?: string; webhooks?: string[]; error?: string} | null>(null);
   const [portainerBranchInput, setPortainerBranchInput] = useState('');
 
@@ -1166,6 +1166,16 @@ export default function AdminPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400">API URL:</span>
                     <code className="text-sm">{portainerStatus.apiUrl}</code>
+                  </div>
+                )}
+                {portainerStatus?.tried && portainerStatus.tried.length > 0 && (
+                  <div className="text-sm text-red-400 mt-1">
+                    Tried URLs:
+                    <ul className="list-disc ml-5">
+                      {portainerStatus.tried.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
