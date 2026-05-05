@@ -19,7 +19,11 @@ jobs:
       - name: Get previous commit hash
         id: prev
         run: |
-          PREV_SHA=$(git rev-parse --short HEAD^)
+          # Get the commit BEFORE this build's commit
+          PREV_SHA=$(git log --oneline -2 | tail -1 | cut -d' ' -f1)
+          if [ -z "$PREV_SHA" ]; then
+            PREV_SHA=$GITHUB_SHA
+          fi
           echo "prev=$PREV_SHA" >> $GITHUB_OUTPUT
 
       - name: Write commit hash
