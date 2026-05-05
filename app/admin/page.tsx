@@ -111,9 +111,13 @@ export default function AdminPage() {
     loadData();
   }, []);
 
-  // Load Portainer branch info when switching to updates tab
+  // Load Portainer branch info when switching to updates/portainer tab
   useEffect(() => {
     if (activeTab === 'updates') {
+      loadBranchInfo();
+      fetch('/api/version').then(r => r.json()).then(d => setBuildInfo(d)).catch(() => setBuildInfo(null));
+    }
+    if (activeTab === 'portainer') {
       loadBranchInfo();
     }
   }, [activeTab]);
@@ -1086,17 +1090,21 @@ export default function AdminPage() {
 
         {activeTab === 'updates' && (
           <div className="bg-slate-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Software Updates</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">Version Info</h2>
             
-            {/* Version info from config */}
             <div className="mb-6 p-4 bg-slate-700 rounded-lg">
               <div className="text-slate-400 text-sm mb-1">App Version</div>
-              <div className="text-white text-lg font-mono">{APP_VERSION}</div>
-              <div className="text-slate-400 text-sm mt-2">Branch</div>
-              <div className="text-white font-mono">{APP_BRANCH}</div>
+              <div className="text-white text-lg font-mono">{buildInfo?.version || 'unknown'}</div>
+              <div className="text-slate-400 text-sm mt-2">Build</div>
+              <div className="text-white font-mono">{buildInfo?.build || buildInfo?.buildHash || 'unknown'}</div>
             </div>
+          </div>
+        )}
 
-            {/* Portainer connection status */}
+        {activeTab === 'portainer' && (
+          <div className="bg-slate-800 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Portainer Deploy</h2>
+
             <div className={`mb-4 p-3 rounded-lg ${portainerAvailable ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
               <div className={portainerAvailable ? 'text-emerald-400' : 'text-red-400'}>
                 {portainerAvailable ? `Connected: ${portainerUrl}` : 'Portainer not detected'}
@@ -1104,13 +1112,12 @@ export default function AdminPage() {
             </div>
 
             {portainerAvailable && (
-              <div className="mt-6 p-4 bg-slate-700 rounded-lg">
+              <div className="p-4 bg-slate-700 rounded-lg">
                 <h3 className="text-white font-semibold mb-3">Deploy Branch</h3>
                 <p className="text-slate-400 text-sm mb-4">
-                  Select which branch to deploy. Click "Update" to apply the change.
+                  Select which branch to deploy.
                 </p>
                 
-                {/* Branch selector */}
                 <div className="flex items-center gap-4 mb-4">
                   <label className="text-slate-400">Branch:</label>
                   <select
@@ -1124,7 +1131,6 @@ export default function AdminPage() {
                   </select>
                 </div>
 
-                {/* Update button */}
                 <button
                   onClick={updateBranch}
                   disabled={updatingBranch}
