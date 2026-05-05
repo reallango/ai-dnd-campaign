@@ -1,0 +1,23 @@
+name: Update Build Hash
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write commit hash
+        run: echo "GIT_COMMIT=${GITHUB_SHA::7}" > .env.build
+
+      - name: Commit and push updated hash
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .env.build
+          git commit -m "Update build hash to ${GITHUB_SHA::7}" || echo "No changes"
+          git push
