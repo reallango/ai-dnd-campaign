@@ -1,12 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    NEXT_PUBLIC_BUILD_HASH: process.env.NEXT_PUBLIC_BUILD_HASH || "docker",
-  },
-  generateBuildId: async () => {
-    // Use the injected build hash from Docker/GitHub Action
-    return process.env.NEXT_PUBLIC_BUILD_HASH || "docker";
-  },
+  webpack: (config) => {
+    // Use shell command at webpack time to get git hash
+    const { execSync } = require("child_process");
+    let shortCommit = "docker";
+    try {
+      shortCommit = execSync("git rev-parse --short HEAD").toString().trim();
+    } catch (e) {
+      // git not available, use default
+    }
+    config.plugins.push(
+      new (require("webpack").DefinePlugin)({
+        "process.env.NEXT_PUBLIC_BUILD_HASH": JSON.stringify(shortCommit)
+      })
+    );
+    return config;
+  }
 };
 
 module.exports = nextConfig;

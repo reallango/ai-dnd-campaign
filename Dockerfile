@@ -1,12 +1,9 @@
 FROM node:22
 
-ARG GIT_COMMIT
-ENV NEXT_PUBLIC_BUILD_HASH=$GIT_COMMIT
-
 WORKDIR /app
 
 # Copy full project first so src/ exists before npm install
-COPY .env.build .env.build
+# Note: .git is now included to allow git rev-parse in webpack
 COPY . .
 
 # Install dependencies
