@@ -6,22 +6,31 @@ let commitHash = process.env.GIT_COMMIT;
 
 if (!commitHash) {
   try {
-    // Get full SHA first, then take first 7 chars
-    const fullHash = execSync("git rev-parse HEAD").toString().trim();
-    commitHash = fullHash.substring(0, 7);
-    console.log("Git full hash:", fullHash);
+    // Try local git first
+    commitHash = execSync("git rev-parse HEAD").toString().trim().substring(0, 7);
   } catch (e) {
-    commitHash = "unknown";
+    try {
+      // Fallback: get current commit from origin using ls-remote
+      const output = execSync("git ls-remote https://github.com/reallango/ai-dnd-campaign.git HEAD").toString();
+      const match = output.match(/^([a-fA-F0-9]+)/);
+      if (match) {
+        commitHash = match[1].substring(0, 7);
+      } else {
+        commitHash = "unknown";
+      }
+    } catch (e2) {
+      commitHash = "unknown";
+    }
   }
 }
 
-// Write to build-info.json for the API endpoint
+// Write to build-info.json
 writeFileSync(
   "./build-info.json",
   JSON.stringify({ buildHash: commitHash })
 );
 
-console.log("Build hash (short):", commitHash);
+console.log("Build hash:", commitHash);
 
 const nextConfig = {
   env: {

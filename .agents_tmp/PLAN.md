@@ -1,52 +1,75 @@
 # 1. OBJECTIVE
 
-Fix the commit hash by copying `.git` directory explicitly in the Dockerfile.
+Fix the commit hash by fetching it from the GitHub remote during the Docker build, since `.git` isn't available in the build context.
 
 # 2. CONTEXT SUMMARY
 
-- **Issue**: Docker's negation pattern `!.git` in .dockerignore doesn't work
-- **Solution**: Use a separate COPY command in Dockerfile for .git
+- **Issue**: Docker builds from GitHub repo, not local filesystem - no `.git` directory available
+- **Solution**: Fetch the current commit hash using `git ls-remote` or GitHub API during build
 
 # 3. APPROACH OVERVIEW
 
-Copy `.git` explicitly in the Dockerfile after the main project copy.
+Two options:
+
+**Option A** (simpler): Use `git ls-remote` to get the current commit from the origin remote
+- Requires git to be installed (already there)
+- Fetches from GitHub to get current HEAD commit
+
+**Option B**: Use GitHub API with a token
+- More reliable but requires token
 
 # 4. IMPLEMENTATION STEPS
 
-**Update Dockerfile**
+**Update next.config.js to fetch from remote**
 
-After the main COPY, add another COPY for .git:
-```dockerfile
-FROM node:22
+```js
+/** @type {import('next').NextConfig} */
+import { execSync } from "child_process";
+import { writeFileSync } from "fs";
 
-# Install git for commit hash detection
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+let commitHash = process.env.GIT_COMMIT;
 
-WORKDIR /app
+if (!commitHash) {
+  try {
+    // Try local git first
+    commitHash = execSync("git rev-parse HEAD").toString().trim().substring(0, 7);
+  } catch (e) {
+    try {
+      // Fallback: get current commit from origin using ls-remote
+      const output = execSync("git ls-remote https://github.com/reallango/ai-dnd-campaign.git HEAD").toString();
+      const match = output.match(/^([a-fA-F0-9]+)/);
+      if (match) {
+        commitHash = match[1].substring(0, 7);
+      } else {
+        commitHash = "unknown";
+      }
+    } catch (e2) {
+      commitHash = "unknown";
+    }
+  }
+}
 
-# Copy full project (excluding .git by default)
-COPY . .
+// Write to build-info.json
+writeFileSync(
+  "./build-info.json",
+  JSON.stringify({ buildHash: commitHash })
+);
 
-# Explicitly copy .git directory
-COPY .git ./.git
+console.log("Build hash:", commitHash);
 
-# Install dependencies
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
+const nextConfig = {
+  env: {
+    NEXT_PUBLIC_BUILD_HASH: commitHash,
+  },
+};
 
-# Build the application
-RUN npm run build
-
-EXPOSE 3000
-CMD ["npm", "start"]
+export default nextConfig;
 ```
 
-**Also remove negation from .dockerignore (clean up)**
-
-The `!.git` line isn't needed in .dockerignore.
+The `git ls-remote` command connects to GitHub and gets the current HEAD commit SHA without needing `.git` locally.
 
 # 5. TESTING AND VALIDATION
 
 - Build Docker image
-- Verify build log shows commit hash
+- Verify build log shows commit hash from GitHub
 - Curl `http://localhost:3000/api/version` - should show actual commit hash
