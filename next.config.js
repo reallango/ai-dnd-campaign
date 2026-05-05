@@ -1,36 +1,42 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config) => {
-    const { execSync, existsSync } = require("child_process");
+    const fs = require("fs");
+    const { execSync } = require("child_process");
     let shortCommit = "docker";
-    
+
     // First try .env.build (updated by GitHub Action)
     try {
-      if (existsSync(".env.build")) {
-        const content = require("fs").readFileSync(".env.build", "utf8");
-        const match = content.match(/GIT_COMMIT=(.+)/);
-        if (match) {
-          shortCommit = match[1].trim();
+      if (fs.existsSync(".env.build")) {
+        const lines = fs.readFileSync(".env.build", "utf8").trim().split("\n");
+        for (const line of lines) {
+          if (line.startsWith("GIT_COMMIT=")) {
+            shortCommit = line.substring(11).trim();
+            break;
+          }
         }
       }
-    } catch (e) {}
-    
+    } catch (e) {
+      console.log("Error reading .env.build:", e.message);
+    }
+
     // Fallback to git rev-parse
-    if (shortCommit === "docker") {
+    if (shortCommit === "docker" || shortCommit.length < 3) {
       try {
         shortCommit = execSync("git rev-parse --short HEAD").toString().trim();
       } catch (e) {
-        // git not available, use default
+        // git not available
       }
     }
-    
-    // Write to file for server-side access
-    require("fs").writeFileSync(
+
+    // Write to file
+    fs.writeFileSync(
       "./build-info.json",
       JSON.stringify({ buildHash: shortCommit })
     );
-    
-    // Also inject for client-side
+
+    console.log("Build hash:", shortCommit);
+
     config.plugins.push(
       new (require("webpack").DefinePlugin)({
         "process.env.NEXT_PUBLIC_BUILD_HASH": JSON.stringify(shortCommit)
