@@ -30,6 +30,12 @@ writeFileSync(
   JSON.stringify({ buildHash: commitHash })
 );
 
+// Also write src/buildInfo.ts for the API
+writeFileSync(
+  "./src/buildInfo.ts",
+  "export const BUILD_HASH: string = '" + commitHash + "'"
+);
+
 console.log("Build hash:", commitHash);
 
 const nextConfig = {

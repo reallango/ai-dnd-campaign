@@ -1,98 +1,86 @@
 # 1. OBJECTIVE
 
-Fix the commit hash by:
-1. Removing the broken COPY .git from Dockerfile  
-2. Fetching commit from GitHub using git ls-remote in next.config.js
+Fix the commit hash - build generates 13e4ea5 but API returns "docker". Need to ensure consistency between what gets written and what gets read.
 
 # 2. CONTEXT SUMMARY
 
-- **Issue 1**: Dockerfile has `COPY .git ./.git` that fails because `.git` doesn't exist in GitHub build context
-- **Issue 2**: Need to fetch commit hash from GitHub instead of local git
+- **Build log shows**: `Build hash: 13e4ea5` - getting written correctly
+- **API returns**: `docker` - old/stale value or wrong file being read
+- **Root cause**: Likely a cached image or the old prebuild script value
 
 # 3. APPROACH OVERVIEW
 
-Remove the broken COPY line and use git ls-remote to fetch the commit.
+1. Fix prebuild script to also use the correct hash
+2. Update API to check both possible file locations  
+3. Clear any caches
 
 # 4. IMPLEMENTATION STEPS
 
-**Step 1: Fix Dockerfile - remove the COPY .git line**
+**Step 1: Fix prebuild script in package.json**
 
-Remove this from Dockerfile:
-```dockerfile
-# Explicitly copy .git directory
-COPY .git ./.git
+Change from:
+```json
+"prebuild": "echo \"export const BUILD_HASH: string = 'localdev'\" > src/buildInfo.ts",
 ```
 
-The Dockerfile should be:
-```dockerfile
-FROM node:22
-
-# Install git for commit hash detection
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-COPY . .
-
-# Install dependencies
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
-
-# Build the application
-RUN npm run build
-
-EXPOSE 3000
-CMD ["npm", "start"]
+To:
+```json
+"prebuild": "echo \"export const BUILD_HASH: string = '$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')\" > src/buildInfo.ts",
 ```
 
-**Step 2: Update next.config.js to use git ls-remote**
+**Step 2: Also write to src/buildInfo.ts in next.config.js**
 
+Add to next.config.js, after writing build-info.json:
 ```js
-/** @type {import('next').NextConfig} */
-import { execSync } from "child_process";
-import { writeFileSync } from "fs";
+writeFileSync(
+  "./src/buildInfo.ts", 
+  `export const BUILD_HASH: string = '${commitHash}'`
+);
+```
 
-let commitHash = process.env.GIT_COMMIT;
+**Step 3: Update version API to check multiple locations**
 
-if (!commitHash) {
-  try {
-    // Try local git first
-    commitHash = execSync("git rev-parse HEAD").toString().trim().substring(0, 7);
-  } catch (e) {
+```ts
+export async function GET() {
+  let buildHash = "unknown";
+  
+  // Check build-info.json (written by next.config.js)
+  const buildInfoPath = join(process.cwd(), "build-info.json");
+  if (existsSync(buildInfoPath)) {
     try {
-      // Fallback: get current commit from origin using ls-remote
-      const output = execSync("git ls-remote https://github.com/reallango/ai-dnd-campaign.git HEAD").toString();
-      const match = output.match(/^([a-fA-F0-9]+)/);
-      if (match) {
-        commitHash = match[1].substring(0, 7);
-      } else {
-        commitHash = "unknown";
-      }
-    } catch (e2) {
-      commitHash = "unknown";
+      const buildInfo = JSON.parse(readFileSync(buildInfoPath, "utf8"));
+      buildHash = buildInfo.buildHash || "unknown";
+    } catch (e) {
+      // ignore
     }
   }
+  
+  // Fallback: check src/buildInfo.ts
+  if (buildHash === "unknown") {
+    const tsPath = join(process.cwd(), "src", "buildInfo.ts");
+    if (existsSync(tsPath)) {
+      try {
+        const content = readFileSync(tsPath, "utf8");
+        const match = content.match(/BUILD_HASH.*?=.*?['"]([^'"]+)['"]/);
+        if (match) {
+          buildHash = match[1];
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+  
+  return NextResponse.json({
+    version: '0.0.1',
+    build: buildHash,
+    buildHash: buildHash
+  });
 }
-
-// Write to build-info.json
-writeFileSync(
-  "./build-info.json",
-  JSON.stringify({ buildHash: commitHash })
-);
-
-console.log("Build hash:", commitHash);
-
-const nextConfig = {
-  env: {
-    NEXT_PUBLIC_BUILD_HASH: commitHash,
-  },
-};
-
-export default nextConfig;
 ```
 
 # 5. TESTING AND VALIDATION
 
-- Build Docker image
-- Verify build log shows commit hash from GitHub (should show 860c143 from the log)
-- Curl `http://localhost:3000/api/version` - should show `860c143`
+- Rebuild Docker image fresh (no cache)
+- Verify build log shows hash being written
+- Curl API returns correct hash
