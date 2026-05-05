@@ -16,8 +16,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get previous commit hash
+        id: prev
+        run: |
+          PREV_SHA=$(git rev-parse --short HEAD^)
+          echo "prev=$PREV_SHA" >> $GITHUB_OUTPUT
+
       - name: Write commit hash
-        run: echo "GIT_COMMIT=${GITHUB_SHA::7}" > .env.build
+        run: echo "GIT_COMMIT=${{ steps.prev.outputs.prev }}" > .env.build
 
       - name: Commit and push updated hash
         run: |
@@ -27,6 +33,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update build hash to ${GITHUB_SHA::7}"
+            git commit -m "Update build hash to ${{ steps.prev.outputs.prev }}"
             git push
           fi
