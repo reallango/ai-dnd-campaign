@@ -3,14 +3,16 @@ const nextConfig = {
   webpack: (config) => {
     const fs = require("fs");
     const { execSync } = require("child_process");
-    let shortCommit = process.env.GIT_COMMIT || "docker";
+    
+    // Try to get from environment first
+    let shortCommit = process.env.GIT_COMMIT;
 
-    // Fallback to git rev-parse
-    if (shortCommit === "docker" || shortCommit.length < 3) {
+    // Fallback to git rev-parse (available if .git is copied to Docker)
+    if (!shortCommit || shortCommit === "unknown") {
       try {
         shortCommit = execSync("git rev-parse --short HEAD").toString().trim();
       } catch (e) {
-        // git not available
+        shortCommit = "unknown";
       }
     }
 
