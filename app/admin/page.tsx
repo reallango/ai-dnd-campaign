@@ -93,10 +93,27 @@ export default function AdminPage() {
   const [updateStatus, setUpdateStatus] = useState('');
   const [redeploying, setRedeploying] = useState(false);
   const [redeployStatus, setRedeployStatus] = useState('');
+  
+  // Portainer branch state
+  const [selectedBranch, setSelectedBranch] = useState('dev');
+  const [availableBranches, setAvailableBranches] = useState<string[]>(['stable', 'dev']);
+  const [deployInfo, setDeployInfo] = useState<{
+    currentBranch: string;
+    pendingBranch?: string;
+  } | null>(null);
+  const [updatingBranch, setUpdatingBranch] = useState(false);
+  const [branchUpdateStatus, setBranchUpdateStatus] = useState('');
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Load Portainer branch info when switching to updates tab
+  useEffect(() => {
+    if (activeTab === 'updates') {
+      loadBranchInfo();
+    }
+  }, [activeTab]);
 
   const loadData = async () => {
     try {
@@ -243,24 +260,66 @@ export default function AdminPage() {
   };
 
   const triggerRedeploy = async () => {
-    setRedeploying(true);
-    setRedeployStatus('');
+    // Deprecated - using new Portainer branch system instead
+  };
+
+  // Load branch info on mount
+  const loadBranchInfo = async () => {
     try {
-      const res = await fetch('/api/admin/redeploy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'redeploy' }),
-      });
+      const res = await fetch('/api/portainer/branches');
       const data = await res.json();
-      if (res.ok && data.success) {
-        setRedeployStatus('Redeploy triggered successfully!');
-      } else {
-        setRedeployStatus(data.error || 'Failed to trigger redeploy');
+      if (res.ok) {
+        setDeployInfo({
+          currentBranch: data.currentBranch || 'stable',
+          pendingBranch: data.pendingBranch,
+        });
+        setAvailableBranches(data.availableBranches || ['stable', 'dev']);
       }
     } catch (err) {
-      setRedeployStatus(err instanceof Error ? err.message : 'Failed to trigger redeploy');
+      console.error('Failed to load branch info:', err);
+    }
+  };
+
+  // Handle branch selection (just stores pending, doesn't update)
+  const handleBranchChange = async (branch: string) => {
+    setSelectedBranch(branch);
+    setBranchUpdateStatus('');
+    try {
+      const res = await fetch('/api/portainer/set-branch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Update local state to show pending
+        setDeployInfo(prev => prev ? { ...prev, pendingBranch: branch } : null);
+      } else {
+        setBranchUpdateStatus(data.error || 'Failed to set branch');
+      }
+    } catch (err) {
+      setBranchUpdateStatus(err instanceof Error ? err.message : 'Failed to set branch');
+    }
+  };
+
+  // Handle Update button click
+  const updateBranch = async () => {
+    setUpdatingBranch(true);
+    setBranchUpdateStatus('');
+    try {
+      const res = await fetch('/api/portainer/update', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBranchUpdateStatus(data.message || 'Updated successfully!');
+        // Refresh branch info
+        await loadBranchInfo();
+      } else {
+        setBranchUpdateStatus(data.error || 'Failed to update');
+      }
+    } catch (err) {
+      setBranchUpdateStatus(err instanceof Error ? err.message : 'Failed to update');
     } finally {
-      setRedeploying(false);
+      setUpdatingBranch(false);
     }
   };
 
@@ -1006,60 +1065,66 @@ export default function AdminPage() {
           <div className="bg-slate-800 rounded-lg p-6">
             <h2 className="text-xl font-semibold text-white mb-4">Software Updates</h2>
             
-            {/* Version info */}
+            {/* Version info from config */}
             <div className="mb-6 p-4 bg-slate-700 rounded-lg">
-              <div className="text-slate-400 text-sm mb-1">Current Version</div>
-              <div className="text-white text-lg font-mono">{versionInfo.currentVersion || APP_VERSION}</div>
+              <div className="text-slate-400 text-sm mb-1">App Version</div>
+              <div className="text-white text-lg font-mono">{APP_VERSION}</div>
               <div className="text-slate-400 text-sm mt-2">Branch</div>
-              <div className="text-white font-mono">{versionInfo.currentBranch || APP_BRANCH}</div>
+              <div className="text-white font-mono">{APP_BRANCH}</div>
             </div>
 
-            {/* Check for updates */}
-            <button
-              onClick={checkForUpdates}
-              disabled={checkingUpdates}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mr-3"
-            >
-              {checkingUpdates ? 'Checking...' : 'Check for Updates'}
-            </button>
-            
-            {versionInfo.latestCommit && (
-              <div className="mt-4 p-3 bg-slate-700 rounded-lg">
-                <div className="text-slate-400 text-sm">Latest Commit</div>
-                <div className="text-white font-mono text-sm">{versionInfo.latestCommit.slice(0, 7)}</div>
-                <div className="text-slate-500 text-xs mt-1">{versionInfo.lastUpdated}</div>
-              </div>
-            )}
-
-            {updateStatus && (
-              <div className={`mt-4 p-3 rounded-lg ${updateStatus.includes('success') || updateStatus.includes('up to date') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
-                <div className={updateStatus.includes('success') || updateStatus.includes('up to date') ? 'text-emerald-400' : 'text-red-400'}>
-                  {updateStatus}
-                </div>
-              </div>
-            )}
-
-            {/* Portainer redeploy */}
-            <div className="mt-8 pt-6 border-t border-slate-600">
-              <h3 className="text-white font-semibold mb-3">Deploy</h3>
-              <p className="text-slate-400 text-sm mb-4">Trigger a redeploy from Portainer to pull the latest changes.</p>
+            {/* Portainer branch management */}
+            <div className="mt-6 p-4 bg-slate-700 rounded-lg">
+              <h3 className="text-white font-semibold mb-3">Deploy Branch</h3>
+              <p className="text-slate-400 text-sm mb-4">
+                Select which branch to deploy. Click "Update" to apply the change.
+              </p>
               
+              {/* Branch selector */}
+              <div className="flex items-center gap-4 mb-4">
+                <label className="text-slate-400">Branch:</label>
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => handleBranchChange(e.target.value)}
+                  className="bg-slate-600 text-white px-3 py-2 rounded-lg border border-slate-500"
+                >
+                  {availableBranches.map(branch => (
+                    <option key={branch} value={branch}>{branch}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Update button */}
               <button
-                onClick={triggerRedeploy}
-                disabled={redeploying}
+                onClick={updateBranch}
+                disabled={updatingBranch}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
-                {redeploying ? 'Triggering...' : 'Redeploy Stack'}
+                {updatingBranch ? 'Updating...' : 'Update'}
               </button>
 
-              {redeployStatus && (
-                <div className={`mt-4 p-3 rounded-lg ${redeployStatus.includes('success') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
-                  <div className={redeployStatus.includes('success') ? 'text-emerald-400' : 'text-red-400'}>
-                    {redeployStatus}
+              {branchUpdateStatus && (
+                <div className={`mt-4 p-3 rounded-lg ${branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+                  <div className={branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'text-emerald-400' : 'text-red-400'}>
+                    {branchUpdateStatus}
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Current deploy status */}
+            {deployInfo && (
+              <div className="mt-6 p-4 bg-slate-700 rounded-lg">
+                <div className="text-slate-400 text-sm">Current Deploy Branch</div>
+                <div className="text-white font-mono text-lg">{deployInfo.currentBranch}</div>
+                {deployInfo.pendingBranch && (
+                  <>
+                    <div className="text-slate-400 text-sm mt-2">Pending Branch</div>
+                    <div className="text-yellow-400 font-mono">{deployInfo.pendingBranch}</div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
