@@ -1,50 +1,42 @@
 # 1. OBJECTIVE
 
-Fix portainer detection by consolidating the duplicate discovery modules into one and ensuring consistent TLS handling.
+Two tasks:
+1. Fix portainer detection to use https.request instead of fetch
+2. Add editable URL input in admin UI
 
-# 2. CONTEXT SUMMARY
+# 2. TASK 1: FIX DETECTION CODE
 
-Found TWO discovery modules that might have conflicting caches:
-1. `src/server/portainerDiscovery.ts` (used by /status) - Bearer auth
-2. `lib/portainerDiscovery.ts` (used by /detect) - X-Api-Key auth
+Replace fetch with https.request in `/src/server/portainerDiscovery.ts`:
 
-Both have the correct URLs (https://host.docker.internal:9443) and rejectUnauthorized: false.
+Replace the existing fetch call with the working https.request pattern.
 
-But they have separate caches and different auth headers.
+# 3. TASK 2: ADMIN UI FOR URL
 
-The curl test proves it WORKS from inside the container with NO token - so maybe the detection should work even without requiring a token for /api/system/status.
+Add editable Portainer URL field to admin page:
+- Input field (pre-filled with saved URL or empty)
+- Test button (tests entered URL, or defaults if blank)
+- Save button (saves successful URL)
 
-# 3. APPROACH OVERVIEW
-
-1. Remove the token requirement for the status check (since it works without auth)2. Delete the duplicate `lib/portainerDiscovery.ts` 
-3. Consolidate all imports to use `src/server/portainerDiscovery.ts`
+The app may already have a settings table - check existing schema first.
 
 # 4. IMPLEMENTATION STEPS
 
-**Step 1: Make status check work without token requirement**
+**Task 1: Fix detection**
 
-In `src/server/portainerDiscovery.ts`, make the status check not require a token (since curl worked without one):
+Update `/src/server/portainerDiscovery.ts` to use https.request/http.request directly.
 
-```ts
-// For status check only - don't require token
-const token = process.env.PORTAINER_API_TOKEN;
-// Still try with token if available, but don't fail if missing
-```
+**Task 2: Add UI**
 
-**Step 2: Delete duplicate `lib/portainerDiscovery.ts`**
+Add to admin page Portainer tab:
+- Input: `<input value={portainerUrl} onChange={setPortainerUrl} placeholder="https://host.docker.internal:9443" />`
+- Test button: calls test endpoint
+- Save button: calls save endpoint
 
-Remove or rename the duplicate:
-```bash
-rm lib/portainerDiscovery.ts
-```
+**API endpoints needed:**
 
-**Step 3: Update API routes to all use the same module**
-
-Update `/app/api/portainer/detect/route.ts` to import from `@/src/server/portainerDiscovery`.
-
-**Step 4: Clear any cached URLs** (in existing routes, call clearCachedUrl())
+- GET/POST /api/admin/settings (check if exists, or reuse)
 
 # 5. TESTING AND VALIDATION
 
-- Test: `curl http://localhost:3000/api/portainer/status`
-- Should return: `{ok: true, reachable: true, apiUrl: "https://host.docker.internal:9443"}`
+- Test detection manually first
+- Then test UI buttons

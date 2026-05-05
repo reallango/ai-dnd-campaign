@@ -109,6 +109,7 @@ export default function AdminPage() {
   const [portainerStatus, setPortainerStatus] = useState<{ok: boolean; reachable: boolean; apiUrl: string | null; error: string | null; missingEnv: string[] | null; tried: string[] | null} | null>(null);
   const [portainerStack, setPortainerStack] = useState<{ok: boolean; id?: number; name?: string; repoUrl?: string; branch?: string; webhooks?: string[]; error?: string} | null>(null);
   const [portainerBranchInput, setPortainerBranchInput] = useState('');
+  const [portainerUrlInput, setPortainerUrlInput] = useState('');
 
   useEffect(() => {
     loadData();
@@ -1135,6 +1136,37 @@ export default function AdminPage() {
             {/* Status Section */}
             <div className="mb-6 p-4 bg-slate-700 rounded-lg">
               <h3 className="text-white font-semibold mb-3">Portainer Status</h3>
+              
+              {/* URL Input Section */}
+              <div className="mb-4 p-3 bg-slate-600 rounded">
+                <label className="block text-slate-400 text-sm mb-1">Portainer URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={portainerUrlInput}
+                    onChange={(e) => setPortainerUrlInput(e.target.value)}
+                    placeholder="https://host.docker.internal:9443"
+                    className="flex-1 bg-slate-700 border border-slate-500 rounded px-3 py-2 text-white text-sm"
+                  />
+                  <button
+                    onClick={async () => {
+                      // Save URL then test
+                      if (portainerUrlInput.trim()) {
+                        await fetch('/api/admin/settings', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ portainer_url: portainerUrlInput.trim() }),
+                        });
+                      }
+                      // Reload status
+                      loadBranchInfo();
+                    }}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm"
+                  >
+                    Test
+                  </button>
+                </div>
+              </div>
               
               {/* Status error block */}
               {portainerStatus && !portainerStatus.ok && (

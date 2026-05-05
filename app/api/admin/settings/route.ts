@@ -38,6 +38,7 @@ export async function GET() {
       smtp_pass: settings.smtp_pass || '',
       smtp_from: settings.smtp_from || '',
       smtp_tls: settings.smtp_tls !== 'false',
+      portainer_url: settings.portainer_url || '',
     });
   } catch (error) {
     console.error('Error loading settings:', error);
@@ -74,6 +75,9 @@ export async function POST(request: NextRequest) {
     if (body.smtp_pass !== undefined) upsert.run('smtp_pass', body.smtp_pass.trim());
     if (body.smtp_from !== undefined) upsert.run('smtp_from', body.smtp_from.trim());
     if (body.smtp_tls !== undefined) upsert.run('smtp_tls', body.smtp_tls ? 'true' : 'false');
+
+    // Save Portainer URL
+    if (body.portainer_url !== undefined) upsert.run('portainer_url', body.portainer_url.trim());
 
     return NextResponse.json({ success: true });
   } catch (error) {

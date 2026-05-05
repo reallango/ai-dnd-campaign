@@ -2,10 +2,7 @@
 // Discovers Portainer API URL at runtime using Bearer token auth
 
 import https from 'https';
-
-const insecureAgent = new https.Agent({
-  rejectUnauthorized: false,
-});
+import http from 'http';
 
 interface PortainerStatus {
   Version: string;
@@ -35,6 +32,38 @@ const CANDIDATE_URLS = [
 ];
 
 let cachedBaseUrl: string | null = null;
+
+/**
+ * HTTP request helper that handles TLS self-signed certs
+ */
+function requestUrl(url: string): Promise<{ok: boolean; data?: PortainerStatus}> {
+  return new Promise((resolve) => {
+    const isHTTPS = url.startsWith('https://');
+    const urlObj = new URL(`${url}/api/system/status`);
+    const protocol = isHTTPS ? https : http;
+    
+    const req = protocol.request({
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHTTPS ? 443 : 80),
+      path: '/api/system/status',
+      method: 'GET',
+      rejectUnauthorized: false, // Accept self-signed certs
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body) as PortainerStatus;
+          resolve({ ok: res.statusCode === 200, data });
+        } catch {
+          resolve({ ok: false });
+        }
+      });
+    });
+    req.on('error', () => resolve({ ok: false }));
+    req.end();
+  });
+}
 
 /**
  * Build candidate URL list in exact order:
@@ -77,19 +106,12 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
   for (const candidate of candidates) {
     tried.push(candidate);
     try {
-      const response = await fetch(`${candidate}/api/system/status`, {
-        method: 'GET',
-        // Allow self-signed certs for HTTPS
-        agent: candidate.startsWith('https://') ? insecureAgent : undefined,
-      } as any);
+      const result = await requestUrl(candidate);
       
-      if (response.ok) {
-        const data = await response.json() as PortainerStatus;
-        if (data && data.Version) {
-          cachedBaseUrl = candidate;
-          console.log(`[Portainer] Detected at: ${candidate}`);
-          return { ok: true, url: candidate };
-        }
+      if (result.ok && result.data?.Version) {
+        cachedBaseUrl = candidate;
+        console.log(`[Portainer] Detected at: ${candidate}`);
+        return { ok: true, url: candidate };
       }
     } catch (e) {
       console.log(`[Portainer] Not reachable: ${candidate}`, e instanceof Error ? e.message : '');
@@ -111,21 +133,12 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
   for (const candidate of candidates) {
     triedWithAuth.push(candidate);
     try {
-      const response = await fetch(`${candidate}/api/system/status`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        agent: candidate.startsWith('https://') ? insecureAgent : undefined,
-      } as any);
+      const result = await requestUrl(candidate);
       
-      if (response.ok) {
-        const data = await response.json() as PortainerStatus;
-        if (data && data.Version) {
-          cachedBaseUrl = candidate;
-          console.log(`[Portainer] Detected at: ${candidate} (with auth)`);
-          return { ok: true, url: candidate };
-        }
+      if (result.ok && result.data?.Version) {
+        cachedBaseUrl = candidate;
+        console.log(`[Portainer] Detected at: ${candidate} (with auth)`);
+        return { ok: true, url: candidate };
       }
     } catch {
       console.log(`[Portainer] Not reachable with auth: ${candidate}`);
@@ -161,20 +174,12 @@ export async function detectPortainerApiUrl(): Promise<string> {
   
   for (const candidate of candidates) {
     try {
-      const response = await fetch(`${candidate}/api/system/status`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const result = await requestUrl(candidate);
       
-      if (response.ok) {
-        const data = await response.json() as PortainerStatus;
-        if (data && data.Version) {
-          cachedBaseUrl = candidate;
-          console.log(`[Portainer] Detected at: ${candidate}`);
-          return candidate;
-        }
+      if (result.ok && result.data?.Version) {
+        cachedBaseUrl = candidate;
+        console.log(`[Portainer] Detected at: ${candidate}`);
+        return candidate;
       }
     } catch {
       console.log(`[Portainer] Not reachable: ${candidate}`);
