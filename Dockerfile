@@ -1,16 +1,15 @@
-# Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:18
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# Copy full project first so src/ exists before npm install
 COPY . .
+
+# Install dependencies
+RUN npm install
+
+# Build the application
 RUN npm run build
 
-# Stage 2: Production runner
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=builder /app ./
-COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
-ENV NODE_ENV=production
-CMD ["node", "node_modules/next/dist/bin/next", "start"]
+CMD ["npm", "start"]
