@@ -20,6 +20,10 @@ interface PortainerUrlError {
 export type PortainerUrlResult = PortainerUrlSuccess | PortainerUrlError;
 
 const CANDIDATE_URLS = [
+  // HTTPS-first (modern Portainer default - port 9443)
+  'https://portainer:9443',
+  'https://host.docker.internal:9443',
+  // Legacy HTTP fallback (port 9000)
   'http://portainer:9000',
   'http://host.docker.internal:9000',
 ];
@@ -29,8 +33,10 @@ let cachedBaseUrl: string | null = null;
 /**
  * Build candidate URL list in exact order:
  * 1. PORTAINER_API_URL env var (if set and non-empty)
- * 2. http://portainer:9000
- * 3. http://host.docker.internal:9000
+ * 2. https://portainer:9443/api
+ * 3. https://host.docker.internal:9443/api
+ * 4. http://portainer:9000/api
+ * 5. http://host.docker.internal:9000/api
  */
 function buildCandidates(): string[] {
   const envUrl = process.env.PORTAINER_API_URL;
@@ -98,11 +104,7 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
   return {
     ok: false,
     error: 'Unable to detect Portainer API URL',
-    tried: [
-      process.env.PORTAINER_API_URL ? process.env.PORTAINER_API_URL : 'PORTAINER_API_URL (empty)',
-      'http://portainer:9000/api',
-      'http://host.docker.internal:9000/api',
-    ],
+    tried: candidates,
     missingEnv: ['PORTAINER_API_URL'],
   };
 }
