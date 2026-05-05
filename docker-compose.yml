@@ -15,6 +15,7 @@ services:
       - db_data:/app/data
     environment:
       - NODE_ENV=production
+      - GIT_COMMIT=${GITHUB_COMMIT:-docker}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - PORTAINER_API_URL=${PORTAINER_API_URL:-""}
       - PORTAINER_API_TOKEN=${PORTAINER_API_TOKEN:-""}
