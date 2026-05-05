@@ -4,3 +4,5 @@ node_modules
 *.log
 campaign.db
 .DS_Store
+# Explicitly include .git for commit hash detection during build
+!.git
