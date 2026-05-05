@@ -1,34 +1,60 @@
 # 1. OBJECTIVE
 
-Fix branch field extraction in portainer client - should read from GitConfig.ReferenceName, not RepositoryReferenceName.
+Two tasks:
+1. Fix branch field extraction in code (GitConfig.ReferenceName)
+2. Update UI to show branch names and dropdown
 
-# 2. CONTEXT SUMMARY
+# 2. CODE FIX: Branch Extraction
 
-The stack is found but branch is showing empty because:
-- Stack field: `GitConfig.ReferenceName` = "refs/heads/main"
-- Code uses: `stack.RepositoryReferenceName` = undefined
+Stack field: `GitConfig.ReferenceName` = "refs/heads/main"
 
-# 3. APPROACH OVERVIEW
+Update code to:
+```ts
+// Read from correct field, strip prefix
+const branch = (stack.GitConfig?.ReferenceName || '').replace('refs/heads/', '');
+```
 
-Update the code to read branch from `GitConfig.ReferenceName`.
+# 3. UI: Branch Names and Dropdown
+
+Display mapping:
+- "refs/heads/stable" → "Stable"
+- "refs/heads/dev" → "Dev"
+- etc.
+
+**In admin page Portainer tab:**
+
+- Show current branch as "Stable" or "Dev" (not the full git ref)
+- Update dropdown with options:
+  - "Stable" (refs/heads/stable)
+  - "Dev" (refs/heads/dev)
+- Pre-select the current branch in the dropdown
+- Update button updates to the selected branch
 
 # 4. IMPLEMENTATION STEPS
 
-**In `/src/server/portainerClient.ts`:**
-
-Find where branch is extracted and update:
+**Code in portainerClient.ts:**
 
 ```ts
-// Current (wrong):
-branch: stack.RepositoryReferenceName || '',
+// Extract and normalize branch name
+const rawBranch = stack.GitConfig?.ReferenceName || '';
+const branch = rawBranch.replace('refs/heads/', ''); // "main" → "main", etc.
 
-// Should be:
-branch: stack.GitConfig?.ReferenceName || '',
+// For display:
+// If branch is "main" or "stable" → "Stable"
+// If branch is "dev" → "Dev"
+const displayName = branch === 'dev' ? 'Dev' : 
+                  branch === 'stable' || branch === 'main' ? 'Stable' :
+                  branch;
 ```
 
-Also need to strip the "refs/heads/" prefix to just show "main".
+**UI in admin page:**
+
+- Dropdown with options: Stable, Dev
+- Value maps: Stable → "refs/heads/stable", Dev → "refs/heads/dev"
+- On update, send the full ref to the API
 
 # 5. TESTING AND VALIDATION
 
-- Test branch shows as "main" not "refs/heads/main"
-- Update button becomes active
+- Branch shows as "Stable" or "Dev" not "refs/heads/main"
+- Dropdown shows current branch selected
+- Update deploys the selected branch

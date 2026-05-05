@@ -1240,7 +1240,63 @@ export default function AdminPage() {
                   {portainerStack.branch && (
                     <div className="flex items-center gap-2">
                       <span className="text-slate-400">Current Branch:</span>
-                      <code className="text-sm">{portainerStack.branch}</code>
+                      <span className="text-green-400 font-semibold">
+                        {portainerStack.branch === 'dev' ? 'Dev' : 
+                         ['main', 'stable'].includes(portainerStack.branch) ? 'Stable' : 
+                         portainerStack.branch}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Branch Selection Dropdown */}
+                  {portainerStack.branch && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <select
+                        value={(portainerBranchInput || 
+                          (portainerStack.branch === 'dev' ? 'refs/heads/dev' : 'refs/heads/stable'))}
+                        onChange={(e) => setPortainerBranchInput(e.target.value)}
+                        className="bg-slate-600 border border-slate-500 rounded px-3 py-2 text-white"
+                      >
+                        <option value="refs/heads/stable">Stable</option>
+                        <option value="refs/heads/dev">Dev</option>
+                      </select>
+                      <button
+                        onClick={async () => {
+                          if (!portainerStack?.id || !portainerBranchInput) return;
+                          setUpdatingBranch(true);
+                          setBranchUpdateStatus('');
+                          try {
+                            const res = await fetch('/api/portainer/update', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                stackId: portainerStack.id, 
+                                branch: portainerBranchInput 
+                              }),
+                            });
+                            const data = await res.json();
+                            if (data.error) {
+                              setBranchUpdateStatus('Error: ' + data.error);
+                            } else {
+                              setBranchUpdateStatus('Updated to ' + portainerBranchInput);
+                              loadBranchInfo();
+                            }
+                          } catch (e) {
+                            setBranchUpdateStatus('Error updating');
+                          } finally {
+                            setUpdatingBranch(false);
+                          }
+                        }}
+                        disabled={updatingBranch}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white disabled:opacity-50"
+                      >
+                        {updatingBranch ? 'Updating...' : 'Update'}
+                      </button>
+                      {branchUpdateStatus && (
+                        <span className={branchUpdateStatus.startsWith('Error') ? 'text-red-400' : 'text-green-400'}>
+                          {branchUpdateStatus}
+                        </span>
+                      )}
                     </div>
                   )}
                   {portainerStack.webhooks && portainerStack.webhooks.length > 0 && (
