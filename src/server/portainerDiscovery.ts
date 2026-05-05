@@ -1,6 +1,12 @@
 // Portainer API URL Discovery Module
 // Discovers Portainer API URL at runtime using Bearer token auth
 
+import https from 'https';
+
+const insecureAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
+
 interface PortainerStatus {
   Version: string;
 }
@@ -85,7 +91,9 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-      });
+        // Allow self-signed certs for internal Docker HTTPS
+        agent: candidate.startsWith('https://') ? insecureAgent : undefined,
+      } as any);
       
       if (response.ok) {
         const data = await response.json() as PortainerStatus;

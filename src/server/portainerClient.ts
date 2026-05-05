@@ -1,7 +1,12 @@
 // Portainer API Client
 // Provides typed wrappers for Portainer API operations
 
+import https from 'https';
 import { detectPortainerApiUrl, getPortainerUrl } from './portainerDiscovery';
+
+const insecureAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
 
 // Types
 export interface Stack {
@@ -98,7 +103,8 @@ export async function getStacks(): Promise<Stack[]> {
   const baseUrl = await detectPortainerApiUrl();
   const response = await fetch(`${baseUrl}/api/stacks`, {
     headers: getAuthHeaders(),
-  });
+    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
+  } as any);
   
   if (!response.ok) {
     throw new Error(`Failed to fetch stacks: ${response.statusText}`);
@@ -114,7 +120,8 @@ export async function getStackById(id: number): Promise<Stack | null> {
   const baseUrl = await detectPortainerApiUrl();
   const response = await fetch(`${baseUrl}/api/stacks/${id}`, {
     headers: getAuthHeaders(),
-  });
+    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
+  } as any);
   
   if (!response.ok) {
     if (response.status === 404) {
@@ -141,7 +148,8 @@ export async function getWebhooksForStack(stackId: number): Promise<Webhook[]> {
   const baseUrl = await detectPortainerApiUrl();
   const response = await fetch(`${baseUrl}/api/stacks/${stackId}/webhooks`, {
     headers: getAuthHeaders(),
-  });
+    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
+  } as any);
   
   if (!response.ok) {
     // Some Portainer versions don't have this endpoint
@@ -157,7 +165,8 @@ export async function getWebhooksForStack(stackId: number): Promise<Webhook[]> {
 export async function triggerWebhookUpdate(webhookUrl: string): Promise<void> {
   const response = await fetch(webhookUrl, {
     method: 'POST',
-  });
+    agent: webhookUrl.startsWith('https://') ? insecureAgent : undefined,
+  } as any);
   
   if (!response.ok) {
     throw new Error(`Webhook failed: ${response.statusText}`);
@@ -181,7 +190,8 @@ export async function triggerStackUpdate(stackId: number, branch: string): Promi
     body: JSON.stringify({
       RepositoryReferenceName: branch,
     }),
-  });
+    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
+  } as any);
   
   if (!updateResponse.ok) {
     const error = await updateResponse.text();
@@ -192,7 +202,8 @@ export async function triggerStackUpdate(stackId: number, branch: string): Promi
   const redeployResponse = await fetch(`${baseUrl}/api/stacks/${stackId}/upstack`, {
     method: 'POST',
     headers: getAuthHeaders(),
-  });
+    agent: baseUrl.startsWith('https://') ? insecureAgent : undefined,
+  } as any);
   
   if (!redeployResponse.ok) {
     console.warn('Stack updated but redeploy may have failed');
