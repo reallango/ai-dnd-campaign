@@ -1,7 +1,7 @@
 // Portainer service module
 // Handles stack discovery, branch management, and updates
 
-import { detectPortainerApiUrl, getPortainerUrl } from './portainerDiscovery';
+import { detectPortainerApiUrl, getPortainerUrl } from '@/src/server/portainerDiscovery';
 
 const GITHUB_OWNER = 'reallango';
 const GITHUB_REPO = 'ai-dnd-campaign';

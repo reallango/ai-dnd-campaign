@@ -70,29 +70,16 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
   
   const token = process.env.PORTAINER_API_TOKEN;
   
-  // If token missing
-  if (!token) {
-    return {
-      ok: false,
-      error: 'Missing Portainer API token',
-      tried: [],
-      missingEnv: ['PORTAINER_API_TOKEN'],
-    };
-  }
-  
   const candidates = buildCandidates();
   const tried: string[] = [];
   
+  // First try without token (works for /api/system/status)
   for (const candidate of candidates) {
     tried.push(candidate);
     try {
       const response = await fetch(`${candidate}/api/system/status`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        // Allow self-signed certs for internal Docker HTTPS
-        agent: candidate.startsWith('https://') ? insecureAgent : undefined,
+        // No auth needed for status endpoint
       } as any);
       
       if (response.ok) {
@@ -108,12 +95,48 @@ export async function detectPortainerApiUrlWithStatus(): Promise<PortainerUrlRes
     }
   }
   
+  // If no token, fail without trying auth
+  if (!token) {
+    return {
+      ok: false,
+      error: 'Portainer not reachable',
+      tried,
+      missingEnv: [],
+    };
+  }
+  
+  // Second try with token (for other API calls that need auth)
+  const triedWithAuth: string[] = [];
+  for (const candidate of candidates) {
+    triedWithAuth.push(candidate);
+    try {
+      const response = await fetch(`${candidate}/api/system/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        agent: candidate.startsWith('https://') ? insecureAgent : undefined,
+      } as any);
+      
+      if (response.ok) {
+        const data = await response.json() as PortainerStatus;
+        if (data && data.Version) {
+          cachedBaseUrl = candidate;
+          console.log(`[Portainer] Detected at: ${candidate} (with auth)`);
+          return { ok: true, url: candidate };
+        }
+      }
+    } catch {
+      console.log(`[Portainer] Not reachable with auth: ${candidate}`);
+    }
+  }
+  
   // All candidates failed
   return {
     ok: false,
     error: 'Unable to detect Portainer API URL',
     tried: candidates,
-    missingEnv: ['PORTAINER_API_URL'],
+    missingEnv: token ? [] : ['PORTAINER_API_TOKEN'],
   };
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBranches, initPortainer, getStackInfo, isPortainerApiAvailable } from '@/lib/portainerService';
-import { detectPortainerApiUrl, getPortainerUrl } from '@/lib/portainerDiscovery';
+import { detectPortainerApiUrl, getPortainerUrl } from '@/src/server/portainerDiscovery';
 
 // Initialize on first request
 let initialized = false;

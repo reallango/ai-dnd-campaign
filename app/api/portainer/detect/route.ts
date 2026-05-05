@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { detectPortainerApiUrl, getPortainerUrl, isPortainerAvailable } from '@/lib/portainerDiscovery';
+import { detectPortainerApiUrl, getPortainerUrl, isPortainerAvailable } from '@/src/server/portainerDiscovery';
 
 // POST /api/portainer/detect - force re-detect Portainer URL
 export async function POST() {
