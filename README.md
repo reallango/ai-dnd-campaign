@@ -39,3 +39,4 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 When deploying, add environment variables in the Vercel dashboard:
 - Project → Settings → Environment Variables
 - Add each variable from `.env.example`
+# test
