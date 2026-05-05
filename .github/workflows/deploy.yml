@@ -1,4 +1,4 @@
-name: Deploy to Portainer
+name: Update Build Info
 
 on:
   push:
@@ -6,15 +6,21 @@ on:
       - main
 
 jobs:
-  trigger-build:
+  update:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'Update build hash')"
     steps:
-      - name: Get short commit
-        id: commit
-        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger Portainer build
+      - name: Update hash
         run: |
-          curl -X POST ${{ secrets.PORTAINER_WEBHOOK_URL }} \
-            -H "Content-Type: application/json" \
-            -d '{"build_args": {"GIT_COMMIT": "${{ steps.commit.outputs.sha }}"}}'
+          echo '{"buildHash": "${{ github.sha }}"}' > build-info.json
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git add build-info.json
+          git commit -m "Update build hash to ${{ github.sha }}"
+          git push
