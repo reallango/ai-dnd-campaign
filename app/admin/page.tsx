@@ -106,6 +106,9 @@ export default function AdminPage() {
   } | null>(null);
   const [updatingBranch, setUpdatingBranch] = useState(false);
   const [branchUpdateStatus, setBranchUpdateStatus] = useState('');
+  const [portainerStatus, setPortainerStatus] = useState<{ok: boolean; reachable: boolean; apiUrl: string | null; error: string | null; missingEnv: string[] | null} | null>(null);
+  const [portainerStack, setPortainerStack] = useState<{ok: boolean; id?: number; name?: string; repoUrl?: string; branch?: string; webhooks?: string[]; error?: string} | null>(null);
+  const [portainerBranchInput, setPortainerBranchInput] = useState('');
 
   useEffect(() => {
     loadData();
@@ -273,15 +276,32 @@ export default function AdminPage() {
   // Load branch info on mount
   const loadBranchInfo = async () => {
     try {
+      // Load full portainer status
+      const statusRes = await fetch('/api/portainer/status');
+      const statusData = await statusRes.json();
+      setPortainerStatus(statusData);
+      setPortainerAvailable(statusData.reachable === true);
+      setPortainerUrl(statusData.apiUrl || null);
+      
+      // Load stack info if reachable
+      if (statusData.reachable) {
+        const stackRes = await fetch('/api/portainer/stack');
+        const stackData = await stackRes.json();
+        setPortainerStack(stackData);
+      } else {
+        setPortainerStack(null);
+      }
+      
+      // Also load branch/deploy info
       const res = await fetch('/api/portainer/branches');
       const data = await res.json();
       
-      // Check if Portainer is available
-      setPortainerAvailable(data.available === true);
-      setPortainerUrl(data.detectedUrl || null);
+      // Check if Portainer is available (deprecated use statusData.reachable)
+      setPortainerAvailable(data.available === true || statusData.reachable === true);
+      setPortainerUrl(data.detectedUrl || statusData.apiUrl || null);
       
-      if (!data.available) {
-        setBranchUpdateStatus(data.error || 'Portainer API not detected');
+      if (!data.available && !statusData.reachable) {
+        setBranchUpdateStatus(statusData.error || data.error || 'Portainer API not detected');
         return;
       }
       
@@ -1103,64 +1123,161 @@ export default function AdminPage() {
 
         {activeTab === 'portainer' && (
           <div className="bg-slate-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Portainer Deploy</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">Portainer Integration</h2>
 
-            <div className={`mb-4 p-3 rounded-lg ${portainerAvailable ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
-              <div className={portainerAvailable ? 'text-emerald-400' : 'text-red-400'}>
-                {portainerAvailable ? `Connected: ${portainerUrl}` : 'Portainer not detected'}
+            {/* Version display */}
+            {buildInfo && (
+              <div className="text-sm text-slate-400 mb-4">
+                Running build {buildInfo.build || buildInfo.buildHash}
+              </div>
+            )}
+
+            {/* Status Section */}
+            <div className="mb-6 p-4 bg-slate-700 rounded-lg">
+              <h3 className="text-white font-semibold mb-3">Portainer Status</h3>
+              
+              {/* Status error block */}
+              {portainerStatus && !portainerStatus.ok && (
+                <div className="bg-red-900/40 border border-red-700 text-red-300 p-4 rounded mb-3">
+                  <div className="font-semibold mb-1">
+                    {portainerStatus.error || "Portainer status error"}
+                  </div>
+                  {portainerStatus.missingEnv && portainerStatus.missingEnv.length > 0 && (
+                    <div className="text-sm text-red-400">
+                      Missing environment variables: {portainerStatus.missingEnv.join(", ")}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {portainerStatus?.ok && portainerStatus.reachable && (
+                  <span className="text-green-400">Portainer reachable</span>
+                )}
+                {!portainerStatus?.ok && portainerStatus?.missingEnv && portainerStatus.missingEnv.length > 0 && (
+                  <span className="text-yellow-400">
+                    Configuration incomplete — missing environment variables.
+                  </span>
+                )}
+                {!portainerStatus?.ok && !portainerStatus?.missingEnv && (
+                  <span className="text-red-400">Portainer unreachable.</span>
+                )}
+                {portainerStatus?.apiUrl && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">API URL:</span>
+                    <code className="text-sm">{portainerStatus.apiUrl}</code>
+                  </div>
+                )}
               </div>
             </div>
 
-            {portainerAvailable && (
-              <div className="p-4 bg-slate-700 rounded-lg">
-                <h3 className="text-white font-semibold mb-3">Deploy Branch</h3>
-                <p className="text-slate-400 text-sm mb-4">
-                  Select which branch to deploy.
-                </p>
-                
-                <div className="flex items-center gap-4 mb-4">
-                  <label className="text-slate-400">Branch:</label>
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => handleBranchChange(e.target.value)}
-                    className="bg-slate-600 text-white px-3 py-2 rounded-lg border border-slate-500"
-                  >
-                    {availableBranches.map(branch => (
-                      <option key={branch} value={branch}>{branch}</option>
-                    ))}
-                  </select>
+            {/* Stack Section */}
+            <div className="mb-6 p-4 bg-slate-700 rounded-lg">
+              <h3 className="text-white font-semibold mb-3">Target Stack</h3>
+              
+              {!portainerStatus?.reachable ? (
+                <div className="text-slate-400">Portainer not reachable</div>
+              ) : portainerStack?.ok && portainerStack.name ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Name:</span>
+                    <span>{portainerStack.name}</span>
+                  </div>
+                  {portainerStack.id !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">ID:</span>
+                      <code className="text-sm">{portainerStack.id}</code>
+                    </div>
+                  )}
+                  {portainerStack.repoUrl && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">Repo URL:</span>
+                      <code className="text-sm">{portainerStack.repoUrl}</code>
+                    </div>
+                  )}
+                  {portainerStack.branch && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">Current Branch:</span>
+                      <code className="text-sm">{portainerStack.branch}</code>
+                    </div>
+                  )}
+                  {portainerStack.webhooks && portainerStack.webhooks.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-slate-400 text-sm">Webhooks:</span>
+                      {portainerStack.webhooks.map((url, i) => (
+                        <code key={i} className="block text-xs text-slate-500 mt-1">{url}</code>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : portainerStack?.error ? (
+                <div className="text-red-400 text-sm">{portainerStack.error}</div>
+              ) : (
+                <div className="text-slate-400">Loading stack info...</div>
+              )}
+            </div>
+
+            {/* Update Section */}
+            <div className="mb-6 p-4 bg-slate-700 rounded-lg">
+              <h3 className="text-white font-semibold mb-3">Update Stack</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-1">Branch name</label>
+                  <input
+                    type="text"
+                    value={portainerBranchInput}
+                    onChange={(e) => setPortainerBranchInput(e.target.value)}
+                    placeholder="e.g., main, stable, dev"
+                    className="w-full bg-slate-600 border border-slate-500 rounded px-3 py-2 text-white placeholder-slate-500"
+                    disabled={!portainerStatus?.ok}
+                  />
                 </div>
 
                 <button
-                  onClick={updateBranch}
-                  disabled={updatingBranch}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  onClick={async () => {
+                    if (!portainerStatus?.ok || !portainerBranchInput.trim()) return;
+                    setUpdatingBranch(true);
+                    setBranchUpdateStatus('');
+                    try {
+                      const res = await fetch('/api/portainer/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ branch: portainerBranchInput.trim() }),
+                      });
+                      const data = await res.json();
+                      if (res.ok && data.ok) {
+                        setBranchUpdateStatus(data.message);
+                      } else {
+                        setBranchUpdateStatus(data.error || 'Update failed');
+                      }
+                    } catch (err) {
+                      setBranchUpdateStatus('Request failed');
+                    } finally {
+                      setUpdatingBranch(false);
+                    }
+                  }}
+                  disabled={!portainerStatus?.ok || !portainerBranchInput.trim() || updatingBranch}
+                  className={`px-4 py-2 rounded ${
+                    portainerStatus?.ok && portainerBranchInput.trim() && !updatingBranch
+                      ? 'bg-purple-600 hover:bg-purple-700'
+                      : 'bg-slate-600 cursor-not-allowed'
+                  }`}
                 >
-                  {updatingBranch ? 'Updating...' : 'Update'}
+                  {updatingBranch ? 'Updating...' : 'Update Stack'}
                 </button>
 
                 {branchUpdateStatus && (
-                  <div className={`mt-4 p-3 rounded-lg ${branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
-                    <div className={branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Switched') ? 'text-emerald-400' : 'text-red-400'}>
-                      {branchUpdateStatus}
-                    </div>
+                  <div className={`p-3 rounded ${
+                    branchUpdateStatus.includes('success') || branchUpdateStatus.includes('Pulled from') || branchUpdateStatus.includes('Updated')
+                      ? 'bg-emerald-900/30 text-emerald-400'
+                      : 'bg-red-900/30 text-red-400'
+                  }`}>
+                    {branchUpdateStatus}
                   </div>
                 )}
               </div>
-            )}
-
-            {portainerAvailable && deployInfo && (
-              <div className="mt-6 p-4 bg-slate-700 rounded-lg">
-                <div className="text-slate-400 text-sm">Current Deploy Branch</div>
-                <div className="text-white font-mono text-lg">{deployInfo.currentBranch}</div>
-                {deployInfo.pendingBranch && (
-                  <div className="mt-2">
-                    <div className="text-slate-400 text-sm">Pending Branch</div>
-                    <div className="text-yellow-400 font-mono">{deployInfo.pendingBranch}</div>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
         )}
       </main>
