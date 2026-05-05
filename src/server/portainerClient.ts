@@ -16,6 +16,7 @@ export interface Stack {
   };
   GitConfig?: {
     URL?: string;
+    ReferenceName?: string; // e.g. "refs/heads/main"
   };
 }
 
@@ -110,6 +111,19 @@ function normalizeGitUrl(url: string | null | undefined): string | null {
   }
 
   return u;
+}
+
+/**
+ * Strip git reference prefix:
+ * "refs/heads/main" → "main"
+ * "refs/heads/feature/x" → "feature/x"
+ */
+function stripRefsPrefix(ref: string | null | undefined): string | null {
+  if (!ref) return null;
+  if (ref.startsWith('refs/heads/')) {
+    return ref.slice(11); // Remove "refs/heads/"
+  }
+  return ref;
 }
 
 /**
@@ -241,7 +255,7 @@ export async function findTargetStack(): Promise<StackResult> {
           id: stack.Id,
           name: stack.Name,
           repoUrl: stack.RepositoryURL || '',
-          branch: stack.RepositoryReferenceName || '',
+          branch: stripRefsPrefix(stack.GitConfig?.ReferenceName) || stack.RepositoryReferenceName || '',
           webhooks,
         };
       }
@@ -258,7 +272,7 @@ export async function findTargetStack(): Promise<StackResult> {
         id: stack.Id,
         name: stack.Name,
         repoUrl: stack.RepositoryURL || '',
-        branch: stack.RepositoryReferenceName || '',
+        branch: stripRefsPrefix(stack.GitConfig?.ReferenceName) || stack.RepositoryReferenceName || '',
         webhooks,
       };
     }
@@ -286,7 +300,7 @@ export async function findTargetStack(): Promise<StackResult> {
       id: stack.Id,
       name: stack.Name,
       repoUrl: stack.RepositoryURL || '',
-      branch: stack.RepositoryReferenceName || '',
+      branch: stripRefsPrefix(stack.GitConfig?.ReferenceName) || stack.RepositoryReferenceName || '',
       webhooks,
     };
   }
