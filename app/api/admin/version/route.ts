@@ -53,6 +53,7 @@ export async function GET() {
       latestCommit,
       lastUpdated,
       message: 'Store deployed commit in settings to enable update checking.',
+      buildHash: process.env.NEXT_PUBLIC_BUILD_HASH || "unknown",
     });
   } catch (error) {
     console.error('Error checking version:', error);
