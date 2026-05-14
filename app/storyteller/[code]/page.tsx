@@ -63,7 +63,7 @@ export default function DMDashboard() {
   const loadCampaignData = useCallback(async () => {
     try {
       // First get campaign to get its numeric ID
-      const campaignRes = await fetch(`https://gm-assist.intisive.com/api/campaigns/${code}`);
+      const campaignRes = await fetch(`/api/campaigns/${code}`);
       const campaignData = await campaignRes.json();
       if (!campaignData.campaign) return;
       setCampaign(campaignData.campaign);
@@ -71,10 +71,10 @@ export default function DMDashboard() {
       
       // Then fetch other data
       const [playersRes, diceRes, aiRes, narrativesRes] = await Promise.all([
-        fetch(`https://gm-assist.intisive.com/api/players?campaignId=${campaignId}`),
-        fetch(`https://gm-assist.intisive.com/api/dice?campaignId=${campaignId}&limit=20`),
-        fetch(`https://gm-assist.intisive.com/api/ai`),
-        fetch(`https://gm-assist.intisive.com/api/narratives/${campaignId}`),
+        fetch(`/api/players?campaignId=${campaignId}`),
+        fetch(`/api/dice?campaignId=${campaignId}&limit=20`),
+        fetch(`/api/ai`),
+        fetch(`/api/narratives/${campaignId}`),
       ]);
       
       const playersData = await playersRes.json();
@@ -111,7 +111,7 @@ export default function DMDashboard() {
     setGenerating(true);
     setAiError('');
     try {
-      const response = await fetch('https://gm-assist.intisive.com/api/ai', {
+      const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -127,7 +127,7 @@ export default function DMDashboard() {
       if (data.content) {
         // Save to database
         try {
-          const saveRes = await fetch(`https://gm-assist.intisive.com/api/narratives/${campaign?.id}`, {
+          const saveRes = await fetch(`/api/narratives/${campaign?.id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -160,7 +160,7 @@ export default function DMDashboard() {
     if (!diceInput.trim()) return;
     
     try {
-      const response = await fetch('https://gm-assist.intisive.com/api/dice', {
+      const response = await fetch('/api/dice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

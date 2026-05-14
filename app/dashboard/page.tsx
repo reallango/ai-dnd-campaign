@@ -98,7 +98,17 @@ export default function Dashboard() {
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {/* Solo Adventure */}
+          <button
+            onClick={() => router.push('/oneshot')}
+            className="p-6 bg-amber-600 hover:bg-amber-700 rounded-lg text-left transition"
+          >
+            <div className="text-3xl mb-2">⚔️</div>
+            <div className="text-white font-semibold">Solo Adventure</div>
+            <div className="text-amber-200 text-sm">Play alone with AI DM</div>
+          </button>
+
           {/* Create Campaign */}
           <button
             onClick={() => router.push('/campaign/new')}
