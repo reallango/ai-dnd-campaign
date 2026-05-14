@@ -56,7 +56,9 @@ interface AgentRole {
   icon: string | null;
   is_active: number;
   sort_order: number;
+  assignments?: RoleAssignment[];
   assignment?: RoleAssignment;
+  activePrompt?: SystemPrompt;
 }
 
 interface RoleAssignment {
@@ -1331,7 +1333,7 @@ function InstancesTabContent() {
 
   useEffect(() => { loadInstances(); }, []);
   useEffect(() => { 
-    if (expandedInstance) loadModelsForInstance(expandedInstance); 
+    if (expandedInstance) loadAllModels(); 
   }, [expandedInstance]);
 
   async function loadInstances() {
@@ -1342,7 +1344,7 @@ function InstancesTabContent() {
     } catch (e) { console.error(e); }
   }
 
-  async function loadModelsForInstance(instanceId: number) {
+  async function loadAllModels() {
     try {
       const res = await fetch('/api/admin/models');
       const data = await res.json();
@@ -1374,7 +1376,7 @@ function InstancesTabContent() {
       const data = await res.json();
       setAiSuccess(`Discovered ${data.discovered || 0} models on ${instance.name}`);
       loadInstances();
-      await loadModels(instance.id);
+      await loadAllModels();
       setTimeout(() => setAiSuccess(''), 3000);
     } catch (e) {
       setAiSuccess('Failed to discover models');
@@ -1501,6 +1503,7 @@ function InstancesTabContent() {
 function RolesTabContent() {
   const [aiRoles, setAiRoles] = useState<AgentRole[]>([]);
   const [aiModels, setAiModels] = useState<AvailableModel[]>([]);
+  const [rolePrompts, setRolePrompts] = useState<Record<number, SystemPrompt[]>>({});
   const [expandedRole, setExpandedRole] = useState<number | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testingRole, setTestingRole] = useState('');
@@ -1509,6 +1512,8 @@ function RolesTabContent() {
   const [testing, setTesting] = useState(false);
   const [aiSuccess, setAiSuccess] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editPromptText, setEditPromptText] = useState('');
+  const [editPromptNotes, setEditPromptNotes] = useState('');
 
   useEffect(() => { loadRoles(); loadModels(); }, []);
 
@@ -1528,24 +1533,29 @@ function RolesTabContent() {
     } catch (e) { console.error(e); }
   }
 
+  async function loadPromptsForRole(roleId: number) {
+    try {
+      const res = await fetch(`/api/admin/prompts/${roleId}`);
+      const data = await res.json();
+      setRolePrompts(prev => ({ ...prev, [roleId]: data.prompts || [] }));
+    } catch (e) { console.error(e); }
+  }
+
   async function saveAssignment(roleId: number, modelId: number, priority: number = 1) {
     setSaving(true);
     try {
-      // Check if assignment already exists for this role and priority
       const existingRes = await fetch(`/api/admin/assignments?role_id=${roleId}`);
       const existingData = await existingRes.json();
       const assignments = existingData.assignments || [];
       const existing = assignments.find((a: any) => a.priority === priority);
       
       if (existing) {
-        // Update existing
         await fetch(`/api/admin/assignments/${existing.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model_id: modelId }),
         });
       } else {
-        // Create new
         await fetch('/api/admin/assignments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1559,6 +1569,39 @@ function RolesTabContent() {
       setAiSuccess('Failed to save assignment');
     }
     setSaving(false);
+  }
+
+  async function saveNewPromptVersion(roleId: number) {
+    if (!editPromptText.trim()) return;
+    setSaving(true);
+    try {
+      await fetch(`/api/admin/prompts/${roleId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt_text: editPromptText, notes: editPromptNotes }),
+      });
+      setAiSuccess('Prompt version saved');
+      loadPromptsForRole(roleId);
+      loadRoles();
+      setEditPromptText('');
+      setEditPromptNotes('');
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to save prompt');
+    }
+    setSaving(false);
+  }
+
+  async function activatePromptVersion(roleId: number, promptId: number) {
+    try {
+      await fetch(`/api/admin/prompts/${roleId}/activate/${promptId}`, { method: 'PUT' });
+      setAiSuccess('Prompt activated');
+      loadPromptsForRole(roleId);
+      loadRoles();
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to activate prompt');
+    }
   }
 
   async function runTestAgent() {
@@ -1578,7 +1621,6 @@ function RolesTabContent() {
     setTesting(false);
   }
 
-  // Group models by instance
   function getModelsGroupedByInstance() {
     const grouped: Record<string, AvailableModel[]> = {};
     for (const model of aiModels) {
@@ -1589,11 +1631,21 @@ function RolesTabContent() {
     return grouped;
   }
 
-  // Get current assignment for a role
   function getCurrentAssignment(roleId: number, priority: number = 1) {
     const role = aiRoles.find(r => r.id === roleId);
-    if (!role?.assignment) return null;
-    return role.assignment.priority === priority ? role.assignment : null;
+    if (!role?.assignments) return null;
+    return role.assignments.find(a => a.priority === priority) || null;
+  }
+
+  function getAssignmentDisplay(roleId: number) {
+    const role = aiRoles.find(r => r.id === roleId);
+    if (!role?.assignments?.length) return null;
+    const primary = role.assignments.find(a => a.priority === 1);
+    const fallback = role.assignments.find(a => a.priority === 2);
+    const parts = [];
+    if (primary) parts.push(`Primary: ${primary.model_tag} (${primary.instance_name})`);
+    if (fallback) parts.push(`Fallback: ${fallback.model_tag} (${fallback.instance_name})`);
+    return parts.join(' | ');
   }
 
   return (
@@ -1605,14 +1657,21 @@ function RolesTabContent() {
         ) : (
           aiRoles.map(role => (
             <div key={role.id} className="bg-slate-700/50 rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setExpandedRole(expandedRole === role.id ? null : role.id)}>
+              <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => {
+                if (expandedRole === role.id) {
+                  setExpandedRole(null);
+                } else {
+                  setExpandedRole(role.id);
+                  loadPromptsForRole(role.id);
+                  setEditPromptText(role.activePrompt?.prompt_text || '');
+                  setEditPromptNotes('');
+                }
+              }}>
                 <div>
                   <div className="text-white font-medium">{role.icon} {role.display_name}</div>
                   <div className="text-slate-400 text-sm">{role.description}</div>
-                  {role.assignment && (
-                    <div className="text-emerald-400 text-xs mt-1">
-                      Assigned: {role.assignment.model_tag} ({role.assignment.instance_name})
-                    </div>
+                  {getAssignmentDisplay(role.id) && (
+                    <div className="text-emerald-400 text-xs mt-1">{getAssignmentDisplay(role.id)}</div>
                   )}
                 </div>
                 <div className="text-slate-400">{expandedRole === role.id ? '▼' : '▶'}</div>
@@ -1668,6 +1727,58 @@ function RolesTabContent() {
                         </select>
                       </div>
                     </div>
+                  </div>
+                  {/* System Prompt */}
+                  <div className="mt-4">
+                    <div className="text-slate-400 text-xs uppercase mb-2">System Prompt {role.activePrompt ? `(v${role.activePrompt.version} - active)` : ''}</div>
+                    <textarea
+                      value={editPromptText}
+                      onChange={(e) => setEditPromptText(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                      rows={6}
+                      placeholder="Enter system prompt..."
+                    />
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={editPromptNotes}
+                        onChange={(e) => setEditPromptNotes(e.target.value)}
+                        className="w-full px-3 py-1 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                        placeholder="Notes (optional)"
+                      />
+                    </div>
+                    <button
+                      onClick={() => saveNewPromptVersion(role.id)}
+                      disabled={saving || !editPromptText.trim()}
+                      className="mt-2 px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      Save New Version
+                    </button>
+                    {/* Prompt Version History */}
+                    {rolePrompts[role.id]?.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-slate-400 text-xs uppercase mb-2">Version History</div>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {rolePrompts[role.id].map(prompt => (
+                            <div key={prompt.id} className="flex justify-between items-center text-sm p-2 bg-slate-800/50 rounded">
+                              <div>
+                                <span className="text-white">v{prompt.version}</span>
+                                {prompt.is_active ? <span className="text-emerald-400 ml-2">(active)</span> : null}
+                                {prompt.notes && <span className="text-slate-400 ml-2">- {prompt.notes}</span>}
+                              </div>
+                              {!prompt.is_active && (
+                                <button
+                                  onClick={() => activatePromptVersion(role.id, prompt.id)}
+                                  className="px-2 py-0.5 text-xs bg-slate-600 text-white rounded hover:bg-slate-500"
+                                >
+                                  Activate
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {/* Test Agent */}
                   <div className="flex gap-2 mt-4">

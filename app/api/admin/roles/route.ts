@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     // Get assignments and parameters for each role
     const rolesWithDetails = roles.map(role => {
-      const assignment = database.prepare(`
+      const assignments = database.prepare(`
         SELECT ra.*, am.model_tag, am.display_name as model_display_name,
                oi.name as instance_name, oi.base_url as instance_base_url
         FROM role_assignments ra
@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
         JOIN ollama_instances oi ON am.instance_id = oi.id
         WHERE ra.role_id = ? AND ra.is_active = 1
         ORDER BY ra.priority ASC
-        LIMIT 1
-      `).get(role.id);
+      `).all(role.id);
+
+      // For backwards compatibility, also set single 'assignment' to first priority
+      const assignment = assignments.length > 0 ? assignments[0] : null;
 
       const parameters = database.prepare(`
         SELECT * FROM role_parameters WHERE role_id = ?
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...role,
+        assignments,
         assignment,
         parameters,
         activePrompt
