@@ -44,6 +44,7 @@ interface AvailableModel {
   parameter_size: string | null;
   quantization: string | null;
   vram_required_mb: number | null;
+  is_available: number;
   instance_name?: string;
 }
 
@@ -55,6 +56,7 @@ interface AgentRole {
   icon: string | null;
   is_active: number;
   sort_order: number;
+  assignment?: RoleAssignment;
 }
 
 interface RoleAssignment {
@@ -1320,6 +1322,7 @@ export default function AdminPage() {
 function InstancesTabContent() {
   const [aiInstances, setAiInstances] = useState<OllamaInstance[]>([]);
   const [aiModels, setAiModels] = useState<AvailableModel[]>([]);
+  const [expandedInstance, setExpandedInstance] = useState<number | null>(null);
   const [showInstanceModal, setShowInstanceModal] = useState(false);
   const [editingInstance, setEditingInstance] = useState<OllamaInstance | null>(null);
   const [instanceForm, setInstanceForm] = useState({ name: '', base_url: '', description: '' });
@@ -1327,6 +1330,9 @@ function InstancesTabContent() {
   const [aiSuccess, setAiSuccess] = useState('');
 
   useEffect(() => { loadInstances(); }, []);
+  useEffect(() => { 
+    if (expandedInstance) loadModelsForInstance(expandedInstance); 
+  }, [expandedInstance]);
 
   async function loadInstances() {
     try {
@@ -1336,12 +1342,16 @@ function InstancesTabContent() {
     } catch (e) { console.error(e); }
   }
 
-  async function loadModels(instanceId: number) {
+  async function loadModelsForInstance(instanceId: number) {
     try {
-      const res = await fetch(`/api/admin/models?instance_id=${instanceId}`);
+      const res = await fetch('/api/admin/models');
       const data = await res.json();
       setAiModels(data.models || []);
     } catch (e) { console.error(e); }
+  }
+
+  function getModelsForInstance(instanceId: number) {
+    return aiModels.filter(m => m.instance_id === instanceId);
   }
 
   async function checkHealth(instance: OllamaInstance) {
@@ -1423,20 +1433,47 @@ function InstancesTabContent() {
           <p className="text-slate-400">No Ollama instances configured. Add one to get started.</p>
         ) : (
           aiInstances.map(instance => (
-            <div key={instance.id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
-              <div>
-                <div className="text-white font-medium">{instance.name}</div>
-                <div className="text-slate-400 text-sm">{instance.base_url}</div>
-                <div className="text-slate-500 text-xs">
-                  Status: {instance.health_status || 'unknown'} | Last check: {instance.last_health_check ? new Date(instance.last_health_check).toLocaleString() : 'never'}
+            <div key={instance.id} className="bg-slate-700/50 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between p-4">
+                <div className="flex-1 cursor-pointer" onClick={() => setExpandedInstance(expandedInstance === instance.id ? null : instance.id)}>
+                  <div className="text-white font-medium">{instance.name}</div>
+                  <div className="text-slate-400 text-sm">{instance.base_url}</div>
+                  <div className="text-slate-500 text-xs">
+                    Status: {instance.health_status || 'unknown'} | Last check: {instance.last_health_check ? new Date(instance.last_health_check).toLocaleString() : 'never'}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); checkHealth(instance); }} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Check</button>
+                  <button onClick={(e) => { e.stopPropagation(); discoverModels(instance); }} disabled={loading} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Discover</button>
+                  <button onClick={(e) => { e.stopPropagation(); setEditingInstance(instance); setInstanceForm({ name: instance.name, base_url: instance.base_url, description: instance.description || '' }); setShowInstanceModal(true); }} className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">Edit</button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteInstance(instance); }} className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-500">Delete</button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => checkHealth(instance)} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Check</button>
-                <button onClick={() => discoverModels(instance)} disabled={loading} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Discover</button>
-                <button onClick={() => { setEditingInstance(instance); setInstanceForm({ name: instance.name, base_url: instance.base_url, description: instance.description || '' }); setShowInstanceModal(true); }} className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">Edit</button>
-                <button onClick={() => deleteInstance(instance)} className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-500">Delete</button>
-              </div>
+              {expandedInstance === instance.id && (
+                <div className="px-4 pb-4 border-t border-slate-600">
+                  <div className="mt-3">
+                    <div className="text-slate-400 text-xs uppercase mb-2">Discovered Models ({getModelsForInstance(instance.id).length})</div>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {getModelsForInstance(instance.id).length === 0 ? (
+                        <p className="text-slate-500 text-sm">No models discovered. Click Discover to scan this instance.</p>
+                      ) : (
+                        getModelsForInstance(instance.id).map(model => (
+                          <div key={model.id} className="flex justify-between items-center text-sm p-2 bg-slate-800/50 rounded">
+                            <div>
+                              <span className="text-white">{model.model_tag}</span>
+                              {model.parameter_size && <span className="text-slate-400 ml-2">({model.parameter_size})</span>}
+                              {model.quantization && <span className="text-slate-500 ml-1">{model.quantization}</span>}
+                            </div>
+                            <span className={`text-xs ${model.is_available ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {model.is_available ? 'Available' : 'Unavailable'}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -1463,6 +1500,7 @@ function InstancesTabContent() {
 
 function RolesTabContent() {
   const [aiRoles, setAiRoles] = useState<AgentRole[]>([]);
+  const [aiModels, setAiModels] = useState<AvailableModel[]>([]);
   const [expandedRole, setExpandedRole] = useState<number | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testingRole, setTestingRole] = useState('');
@@ -1470,8 +1508,9 @@ function RolesTabContent() {
   const [testResult, setTestResult] = useState('');
   const [testing, setTesting] = useState(false);
   const [aiSuccess, setAiSuccess] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => { loadRoles(); }, []);
+  useEffect(() => { loadRoles(); loadModels(); }, []);
 
   async function loadRoles() {
     try {
@@ -1479,6 +1518,47 @@ function RolesTabContent() {
       const data = await res.json();
       setAiRoles(data.roles || []);
     } catch (e) { console.error(e); }
+  }
+
+  async function loadModels() {
+    try {
+      const res = await fetch('/api/admin/models');
+      const data = await res.json();
+      setAiModels(data.models || []);
+    } catch (e) { console.error(e); }
+  }
+
+  async function saveAssignment(roleId: number, modelId: number, priority: number = 1) {
+    setSaving(true);
+    try {
+      // Check if assignment already exists for this role and priority
+      const existingRes = await fetch(`/api/admin/assignments?role_id=${roleId}`);
+      const existingData = await existingRes.json();
+      const assignments = existingData.assignments || [];
+      const existing = assignments.find((a: any) => a.priority === priority);
+      
+      if (existing) {
+        // Update existing
+        await fetch(`/api/admin/assignments/${existing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_id: modelId }),
+        });
+      } else {
+        // Create new
+        await fetch('/api/admin/assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role_id: roleId, model_id: modelId, priority }),
+        });
+      }
+      setAiSuccess('Assignment saved');
+      loadRoles();
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to save assignment');
+    }
+    setSaving(false);
   }
 
   async function runTestAgent() {
@@ -1498,17 +1578,22 @@ function RolesTabContent() {
     setTesting(false);
   }
 
-  async function activatePrompt(roleId: number, promptId: number) {
-    try {
-      const res = await fetch(`/api/admin/prompts/${roleId}/activate/${promptId}`, { method: 'POST' });
-      if (res.ok) {
-        setAiSuccess('Prompt activated');
-        loadRoles();
-        setTimeout(() => setAiSuccess(''), 3000);
-      }
-    } catch (e) {
-      setAiSuccess('Failed to activate');
+  // Group models by instance
+  function getModelsGroupedByInstance() {
+    const grouped: Record<string, AvailableModel[]> = {};
+    for (const model of aiModels) {
+      const instanceName = model.instance_name || 'Unknown';
+      if (!grouped[instanceName]) grouped[instanceName] = [];
+      grouped[instanceName].push(model);
     }
+    return grouped;
+  }
+
+  // Get current assignment for a role
+  function getCurrentAssignment(roleId: number, priority: number = 1) {
+    const role = aiRoles.find(r => r.id === roleId);
+    if (!role?.assignment) return null;
+    return role.assignment.priority === priority ? role.assignment : null;
   }
 
   return (
@@ -1524,11 +1609,67 @@ function RolesTabContent() {
                 <div>
                   <div className="text-white font-medium">{role.icon} {role.display_name}</div>
                   <div className="text-slate-400 text-sm">{role.description}</div>
+                  {role.assignment && (
+                    <div className="text-emerald-400 text-xs mt-1">
+                      Assigned: {role.assignment.model_tag} ({role.assignment.instance_name})
+                    </div>
+                  )}
                 </div>
                 <div className="text-slate-400">{expandedRole === role.id ? '▼' : '▶'}</div>
               </div>
               {expandedRole === role.id && (
                 <div className="px-4 pb-4 border-t border-slate-600">
+                  {/* Model Assignment */}
+                  <div className="mt-4">
+                    <div className="text-slate-400 text-xs uppercase mb-2">Model Assignment</div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-slate-300 text-sm mb-1">Primary Model</label>
+                        <select
+                          value={getCurrentAssignment(role.id, 1)?.model_id || ''}
+                          onChange={(e) => {
+                            if (e.target.value) saveAssignment(role.id, parseInt(e.target.value), 1);
+                          }}
+                          disabled={saving}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                        >
+                          <option value="">Select model...</option>
+                          {Object.entries(getModelsGroupedByInstance()).map(([instanceName, models]) => (
+                            <optgroup key={instanceName} label={instanceName}>
+                              {models.map(model => (
+                                <option key={model.id} value={model.id}>
+                                  {instanceName} / {model.model_tag}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 text-sm mb-1">Fallback Model (Priority 2)</label>
+                        <select
+                          value={getCurrentAssignment(role.id, 2)?.model_id || ''}
+                          onChange={(e) => {
+                            if (e.target.value) saveAssignment(role.id, parseInt(e.target.value), 2);
+                          }}
+                          disabled={saving}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                        >
+                          <option value="">Select fallback...</option>
+                          {Object.entries(getModelsGroupedByInstance()).map(([instanceName, models]) => (
+                            <optgroup key={instanceName} label={instanceName}>
+                              {models.map(model => (
+                                <option key={model.id} value={model.id}>
+                                  {instanceName} / {model.model_tag}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Test Agent */}
                   <div className="flex gap-2 mt-4">
                     <button onClick={() => { setTestingRole(role.role_key); setShowTestModal(true); }} className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">Test Agent</button>
                   </div>
