@@ -232,14 +232,19 @@ export default function OneShotPage() {
     }
   };
   
-  // Theme Selection Step
+// Theme Selection Step
   if (step === 'theme') {
     return (
       <div className="min-h-screen bg-slate-900">
         <header className="bg-slate-800 border-b border-slate-700">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold text-gold">⚔️ One-Shot Adventure</h1>
-            <p className="text-slate-400">A solo D&D adventure powered by AI</p>
+          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gold">⚔️ One-Shot Adventure</h1>
+              <p className="text-slate-400">A solo D&D adventure powered by AI</p>
+            </div>
+            <button onClick={() => router.push('/dashboard')} className="btn btn-secondary text-sm">
+              ← Dashboard
+            </button>
           </div>
         </header>
         
