@@ -6,6 +6,7 @@ import { discoverModels, discoverAllModels, getAvailableModels, getAllAvailableM
 import { checkInstanceHealth, checkAllInstancesHealth, startHealthChecks, stopHealthChecks, restartHealthChecks } from './health';
 import { buildContext, formatGameContext } from './context';
 import type { OllamaInstance, AvailableModel, AgentRole, RoleAssignment, RoleParameters, SystemPrompt, AppSetting, ResolvedAgent, GameContext, AIConfig, AIRequest, AIResponse } from './types';
+import db from '@/lib/db';
 
 // Legacy compatibility: Re-export callAI and checkAIAvailability
 // These maintain backwards compatibility with the old lib/ai.ts API
@@ -26,25 +27,46 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
 
 export async function checkAIAvailability(): Promise<{ available: boolean; provider: string; model?: string; error?: string }> {
   try {
-    // Try to ping default local Ollama
-    const response = await fetch('http://localhost:11434/api/tags', {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000)
-    });
+    const database = db as any;
     
-    if (response.ok) {
-      return {
-        available: true,
-        provider: 'ollama',
-        model: 'llama3' // default
-      };
+    // Get all active Ollama instances from database
+    const instances = database.prepare(`
+      SELECT id, name, base_url FROM ollama_instances WHERE is_active = 1
+    `).all() as { id: number; name: string; base_url: string }[];
+    
+    if (instances.length === 0) {
+      return { available: false, provider: 'ollama', error: 'No Ollama instances configured' };
     }
-    return { available: false, provider: 'ollama', error: 'Connection failed' };
+    
+    // Check health of each instance
+    for (const instance of instances) {
+      try {
+        const response = await fetch(`${instance.base_url}/api/tags`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const models = data.models || [];
+          return {
+            available: true,
+            provider: 'ollama',
+            model: models[0]?.name || 'llama3'
+          };
+        }
+      } catch (e) {
+        // Continue to next instance
+        continue;
+      }
+    }
+    
+    return { available: false, provider: 'ollama', error: 'All instances are offline' };
   } catch (error) {
     return { 
       available: false, 
       provider: 'ollama', 
-      error: error instanceof Error ? error.message : 'Connection failed' 
+      error: error instanceof Error ? error.message : 'Failed to check availability' 
     };
   }
 }

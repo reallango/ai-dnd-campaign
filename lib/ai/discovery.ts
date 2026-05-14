@@ -77,10 +77,9 @@ export async function discoverModels(instanceId: number): Promise<{ discovered: 
         upsertStmt.run(
           instanceId,
           ollamaModel.name,
-          model,  // display_name
+          model,
           paramSize,
           quantization,
-          1,
           currentTime
         );
         discoveredCount++;
