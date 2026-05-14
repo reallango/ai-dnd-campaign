@@ -608,6 +608,12 @@ export default function AdminPage() {
             🤖 AI Settings
           </button>
           <button
+            onClick={() => router.push('/admin/ai')}
+            className="px-4 py-2 rounded-lg text-slate-400 hover:text-white"
+          >
+            🧠 AI Config
+          </button>
+          <button
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2 rounded-lg ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >

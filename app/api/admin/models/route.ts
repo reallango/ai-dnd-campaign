@@ -1,26 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// GET /api/admin/models - check currently loaded models (Ollama)
+
 export async function GET(request: NextRequest) {
   try {
-    // Get base URL from query params or use default
-    const { searchParams } = new URL(request.url);
-    const ai_base_url = searchParams.get('base_url') || process.env.AI_BASE_URL || 'http://localhost:11434';
-    
-    try {
-      const res = await fetch(`${ai_base_url}/api/ps`, {
-        method: 'GET',
-      });
-      const data = await res.json();
-      
-      const loadedModels = (data.models || []).map((m: any) => m.name).filter(Boolean);
-      return NextResponse.json({ loaded_models: loadedModels });
-    } catch (e) {
-      return NextResponse.json({ error: 'Failed to connect to Ollama' }, { status: 400 });
-    }
+    // Return models from our new database-driven system
+    const database = db as any;
+    const models = database.prepare(`
+      SELECT am.*, oi.name as instance_name, oi.base_url as instance_base_url
+      FROM available_models am
+      JOIN ollama_instances oi ON am.instance_id = oi.id
+      ORDER BY oi.name, am.model_tag
+    `).all();
+
+    return NextResponse.json({ models });
   } catch (error) {
-    console.error('Error checking loaded models:', error);
-    return NextResponse.json({ error: 'Failed to check loaded models' }, { status: 500 });
+    console.error('Error fetching models:', error);
+    return NextResponse.json({ error: 'Failed to fetch models' }, { status: 500 });
   }
 }
 

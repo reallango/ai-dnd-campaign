@@ -28,6 +28,14 @@ export function initDb() {
     db.exec(`ALTER TABLE users ADD COLUMN password_reset_expires DATETIME`);
   } catch (e) { /* column may already exist */ }
   
+  // Run AI configuration migration
+  try {
+    const { runAIMigration } = require('./ai-migration');
+    runAIMigration();
+  } catch (e) {
+    console.log('AI migration:', e);
+  }
+  
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
