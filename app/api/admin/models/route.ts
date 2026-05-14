@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-
+import db from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
-    // Return models from our new database-driven system
     const database = db as any;
     const models = database.prepare(`
       SELECT am.*, oi.name as instance_name, oi.base_url as instance_base_url

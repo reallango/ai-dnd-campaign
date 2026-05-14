@@ -46,7 +46,7 @@ export function buildContext(campaignId: number, sessionId?: number): GameContex
 
   // Parse stats JSON
   for (const char of characters) {
-    if (char.stats) {
+    if (typeof char.stats === 'string') {
       try {
         char.stats = JSON.parse(char.stats);
       } catch {

@@ -1,18 +1,64 @@
 // AI Module - Database-driven multi-agent AI configuration system
 
-// Types
-export * from './types';
+import { routeTask, testAgent, chat } from './router';
+import { OllamaClient, createOllamaClient } from './ollama-client';
+import { discoverModels, discoverAllModels, getAvailableModels, getAllAvailableModels } from './discovery';
+import { checkInstanceHealth, checkAllInstancesHealth, startHealthChecks, stopHealthChecks, restartHealthChecks } from './health';
+import { buildContext, formatGameContext } from './context';
+import type { OllamaInstance, AvailableModel, AgentRole, RoleAssignment, RoleParameters, SystemPrompt, AppSetting, ResolvedAgent, GameContext, AIConfig, AIRequest, AIResponse } from './types';
 
-// Router
+// Legacy compatibility: Re-export callAI and checkAIAvailability
+// These maintain backwards compatibility with the old lib/ai.ts API
+
+export async function callAI(request: AIRequest): Promise<AIResponse> {
+  // Default to DM role for backwards compatibility
+  const result = await routeTask('dm', request.prompt, undefined, {
+    temperature: request.temperature ?? 0.7,
+    max_tokens: request.maxTokens ?? 500,
+    num_ctx: request.contextWindow ?? 4096,
+  }, request.maxTokens);
+  
+  return {
+    content: result.content,
+    model: result.model,
+  };
+}
+
+export async function checkAIAvailability(): Promise<{ available: boolean; provider: string; model?: string; error?: string }> {
+  try {
+    // Try to ping default local Ollama
+    const response = await fetch('http://localhost:11434/api/tags', {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    if (response.ok) {
+      return {
+        available: true,
+        provider: 'ollama',
+        model: 'llama3' // default
+      };
+    }
+    return { available: false, provider: 'ollama', error: 'Connection failed' };
+  } catch (error) {
+    return { 
+      available: false, 
+      provider: 'ollama', 
+      error: error instanceof Error ? error.message : 'Connection failed' 
+    };
+  }
+}
+
+// Re-export router functions
 export { resolveAgent, routeTask, testAgent, chat } from './router';
 
-// Ollama Client
+// Re-export Ollama client
 export { OllamaClient, createOllamaClient } from './ollama-client';
 
-// Discovery
+// Re-export discovery
 export { discoverModels, discoverAllModels, getAvailableModels, getAllAvailableModels } from './discovery';
 
-// Health
+// Re-export health
 export { 
   checkInstanceHealth, 
   checkAllInstancesHealth, 
@@ -23,5 +69,8 @@ export {
   getHealthCheckInterval 
 } from './health';
 
-// Context
+// Re-export context
 export { buildContext, formatGameContext } from './context';
+
+// Types
+export * from './types';

@@ -211,3 +211,33 @@ export interface OllamaChatResponse {
 export interface OllamaHealthResponse {
   status: string;
 }
+
+// Legacy types for backwards compatibility with old lib/ai.ts API
+export interface AIConfig {
+  provider: 'ollama' | 'openai' | 'anthropic' | 'deepseek';
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  contextWindow?: number;
+  keepLoaded?: number;
+  adultContent?: boolean;
+  timeout?: number;
+}
+
+export interface AIRequest {
+  prompt: string;
+  system?: string;
+  maxTokens?: number;
+  temperature?: number;
+  contextWindow?: number;
+  keepLoaded?: number;
+}
+
+export interface AIResponse {
+  content: string;
+  model: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+}

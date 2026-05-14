@@ -1,10 +1,9 @@
 // Database Migration: AI Configuration System
 // This migration adds all tables needed for the database-driven AI configuration system
+// Run this after db.ts has initialized the database
 
-import db from './db';
-
-export function runAIMigration() {
-  const database = db as any;
+export function runAIMigration(db: any) {
+  const database = db;
   
   // Run the migration
   database.exec(`
@@ -273,6 +272,3 @@ Make character creation an engaging experience, not a form to fill out. Help pla
 
   console.log('AI configuration migration completed');
 }
-
-// Run migration if imported
-runAIMigration();

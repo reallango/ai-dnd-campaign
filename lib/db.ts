@@ -31,7 +31,7 @@ export function initDb() {
   // Run AI configuration migration
   try {
     const { runAIMigration } = require('./ai-migration');
-    runAIMigration();
+    runAIMigration(db);
   } catch (e) {
     console.log('AI migration:', e);
   }
