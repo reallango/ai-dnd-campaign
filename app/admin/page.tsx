@@ -1512,8 +1512,8 @@ function RolesTabContent() {
   const [testing, setTesting] = useState(false);
   const [aiSuccess, setAiSuccess] = useState('');
   const [saving, setSaving] = useState(false);
-  const [editPromptText, setEditPromptText] = useState('');
-  const [editPromptNotes, setEditPromptNotes] = useState('');
+  const [editPromptTexts, setEditPromptTexts] = useState<Record<number, string>>({});
+  const [editPromptNotesMap, setEditPromptNotesMap] = useState<Record<number, string>>({});
 
   useEffect(() => { loadRoles(); loadModels(); }, []);
 
@@ -1572,19 +1572,20 @@ function RolesTabContent() {
   }
 
   async function saveNewPromptVersion(roleId: number) {
-    if (!editPromptText.trim()) return;
+    const promptText = editPromptTexts[roleId] || '';
+    const notes = editPromptNotesMap[roleId] || '';
+    if (!promptText.trim()) return;
     setSaving(true);
     try {
       await fetch(`/api/admin/prompts/${roleId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt_text: editPromptText, notes: editPromptNotes }),
+        body: JSON.stringify({ prompt_text: promptText, notes }),
       });
       setAiSuccess('Prompt version saved');
       loadPromptsForRole(roleId);
-      loadRoles();
-      setEditPromptText('');
-      setEditPromptNotes('');
+      await loadRoles();
+      setEditPromptNotesMap(prev => ({ ...prev, [roleId]: '' }));
       setTimeout(() => setAiSuccess(''), 3000);
     } catch (e) {
       setAiSuccess('Failed to save prompt');
@@ -1648,6 +1649,13 @@ function RolesTabContent() {
     return parts.join(' | ');
   }
 
+  function hasUnsavedChanges(roleId: number): boolean {
+    const role = aiRoles.find(r => r.id === roleId);
+    if (!role?.activePrompt) return !!(editPromptTexts[roleId] || '').trim();
+    const currentText = editPromptTexts[roleId] || '';
+    return currentText !== role.activePrompt.prompt_text;
+  }
+
   return (
     <div>
       {aiSuccess && <div className="mb-4 p-3 bg-emerald-900/30 text-emerald-400 rounded-lg">{aiSuccess}</div>}
@@ -1663,8 +1671,13 @@ function RolesTabContent() {
                 } else {
                   setExpandedRole(role.id);
                   loadPromptsForRole(role.id);
-                  setEditPromptText(role.activePrompt?.prompt_text || '');
-                  setEditPromptNotes('');
+                  // Initialize per-role prompt text only if not already edited
+                  if (!editPromptTexts[role.id]) {
+                    setEditPromptTexts(prev => ({ ...prev, [role.id]: role.activePrompt?.prompt_text || '' }));
+                  }
+                  if (!editPromptNotesMap[role.id]) {
+                    setEditPromptNotesMap(prev => ({ ...prev, [role.id]: '' }));
+                  }
                 }
               }}>
                 <div>
@@ -1730,10 +1743,13 @@ function RolesTabContent() {
                   </div>
                   {/* System Prompt */}
                   <div className="mt-4">
-                    <div className="text-slate-400 text-xs uppercase mb-2">System Prompt {role.activePrompt ? `(v${role.activePrompt.version} - active)` : ''}</div>
+                    <div className="text-slate-400 text-xs uppercase mb-2">
+                      System Prompt {role.activePrompt ? `(v${role.activePrompt.version} - active)` : ''}
+                      {hasUnsavedChanges(role.id) && <span className="text-amber-400 ml-2">(unsaved)</span>}
+                    </div>
                     <textarea
-                      value={editPromptText}
-                      onChange={(e) => setEditPromptText(e.target.value)}
+                      value={editPromptTexts[role.id] || ''}
+                      onChange={(e) => setEditPromptTexts(prev => ({ ...prev, [role.id]: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                       rows={6}
                       placeholder="Enter system prompt..."
@@ -1741,19 +1757,27 @@ function RolesTabContent() {
                     <div className="mt-2">
                       <input
                         type="text"
-                        value={editPromptNotes}
-                        onChange={(e) => setEditPromptNotes(e.target.value)}
+                        value={editPromptNotesMap[role.id] || ''}
+                        onChange={(e) => setEditPromptNotesMap(prev => ({ ...prev, [role.id]: e.target.value }))}
                         className="w-full px-3 py-1 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                         placeholder="Notes (optional)"
                       />
                     </div>
-                    <button
-                      onClick={() => saveNewPromptVersion(role.id)}
-                      disabled={saving || !editPromptText.trim()}
-                      className="mt-2 px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50"
-                    >
-                      Save New Version
-                    </button>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => saveNewPromptVersion(role.id)}
+                        disabled={saving || !(editPromptTexts[role.id] || '').trim()}
+                        className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50"
+                      >
+                        Save New Version
+                      </button>
+                      <button
+                        onClick={() => setEditPromptTexts(prev => ({ ...prev, [role.id]: role.activePrompt?.prompt_text || '' }))}
+                        className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500"
+                      >
+                        Reset
+                      </button>
+                    </div>
                     {/* Prompt Version History */}
                     {rolePrompts[role.id]?.length > 0 && (
                       <div className="mt-3">
