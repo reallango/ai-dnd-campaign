@@ -44,7 +44,7 @@ export async function discoverModels(instanceId: number): Promise<{ discovered: 
     // Upsert discovered models
     const upsertStmt = database.prepare(`
       INSERT INTO available_models (instance_id, model_tag, display_name, parameter_size, quantization, is_available, last_seen)
-      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      VALUES (?, ?, ?, ?, ?, 1, ?)
       ON CONFLICT(instance_id, model_tag) DO UPDATE SET
         display_name = COALESCE(excluded.display_name, available_models.display_name),
         parameter_size = COALESCE(excluded.parameter_size, available_models.parameter_size),
