@@ -242,8 +242,9 @@ Make character creation an engaging experience, not a form to fill out. Help pla
   ];
 
   const insertPrompt = database.prepare(`
-    INSERT OR IGNORE INTO system_prompts (role_id, prompt_text, version, is_active, notes)
-    VALUES (@role_id, @prompt_text, 1, 1, @notes)
+    INSERT INTO system_prompts (role_id, prompt_text, version, is_active, notes)
+    SELECT @role_id, @prompt_text, 1, 1, @notes
+    WHERE NOT EXISTS (SELECT 1 FROM system_prompts WHERE role_id = @role_id)
   `);
 
   for (const p of seedPrompts) {
