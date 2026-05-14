@@ -24,6 +24,74 @@ interface User {
   created_at: string;
 }
 
+// AI Configuration interfaces
+interface OllamaInstance {
+  id: number;
+  name: string;
+  base_url: string;
+  description: string | null;
+  is_active: number;
+  last_health_check: string | null;
+  health_status: string;
+  created_at: string;
+}
+
+interface AvailableModel {
+  id: number;
+  instance_id: number;
+  model_tag: string;
+  display_name: string | null;
+  parameter_size: string | null;
+  quantization: string | null;
+  vram_required_mb: number | null;
+  instance_name?: string;
+}
+
+interface AgentRole {
+  id: number;
+  role_key: string;
+  display_name: string;
+  description: string | null;
+  icon: string | null;
+  is_active: number;
+  sort_order: number;
+}
+
+interface RoleAssignment {
+  id: number;
+  role_id: number;
+  model_id: number;
+  priority: number;
+  model_tag?: string;
+  instance_name?: string;
+}
+
+interface RoleParameters {
+  id: number;
+  role_id: number;
+  temperature: number;
+  top_p: number;
+  top_k: number;
+  repeat_penalty: number;
+  num_ctx: number;
+  max_tokens: number;
+}
+
+interface SystemPrompt {
+  id: number;
+  role_id: number;
+  prompt_text: string;
+  version: number;
+  is_active: number;
+  notes: string | null;
+}
+
+interface AppSetting {
+  key: string;
+  value: string;
+  description: string | null;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -43,10 +111,13 @@ export default function AdminPage() {
   const [loadedModels, setLoadedModels] = useState<string[]>([]);
   const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'settings' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer'>('settings');
+  const [activeTab, setActiveTab] = useState<'aiConfig' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer'>('aiConfig');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  
+  // AI Configuration state (from /admin/ai page)
+  const [aiActiveTab, setAiActiveTab] = useState<'instances' | 'roles' | 'settings'>('instances');
   
   // API tokens state
   const [apiTokens, setApiTokens] = useState<{id: number; name: string; expiresAt: string; createdAt: string}[]>([]);
@@ -600,18 +671,12 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-lg ${activeTab === 'settings' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            onClick={() => setActiveTab('aiConfig')}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'aiConfig' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
-            🤖 AI Settings
-          </button>
-          <button
-            onClick={() => router.push('/admin/ai')}
-            className="px-4 py-2 rounded-lg text-slate-400 hover:text-white"
-          >
-            🧠 AI Config
+            🤖 AI Configuration
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -651,182 +716,44 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {activeTab === 'settings' && (
-          <form onSubmit={saveSettings} className="bg-slate-800 rounded-lg p-6 space-y-4">
+        {activeTab === 'aiConfig' && (
+          <div className="bg-slate-800 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-white mb-4">AI Configuration</h2>
             
-            <div>
-              <label className="block text-slate-300 text-sm mb-1">AI Provider</label>
-              <select
-                value={settings.ai_provider}
-                onChange={(e) => setSettings({ ...settings, ai_provider: e.target.value })}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+            {/* Sub-tabs for AI Configuration sections */}
+            <div className="flex gap-2 mb-6 border-b border-slate-700 pb-2">
+              <button
+                onClick={() => setAiActiveTab('instances')}
+                className={`px-4 py-2 rounded-t-lg ${aiActiveTab === 'instances' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
               >
-                <option value="ollama">Ollama (Local)</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="deepseek">DeepSeek</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-300 text-sm mb-1">Base URL</label>
-              <input
-                type="text"
-                value={settings.ai_base_url}
-                onChange={(e) => setSettings({ ...settings, ai_base_url: e.target.value })}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-300 text-sm mb-1">Model</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.ai_model}
-                  onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
-                  className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                  placeholder="llama3"
-                />
-                <button 
-                  type="button" 
-                  onClick={fetchModels}
-                  disabled={fetchingModels || !settings.ai_base_url}
-                  className="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm rounded whitespace-nowrap"
-                >
-                  {fetchingModels ? 'Loading...' : 'Get Models'}
-                </button>
-              </div>
-              {availableModels.length > 0 && (
-                <select
-                  value={settings.ai_model }
-                  onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
-                  className="mt-2 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                >
-                  <option value="">Select model...</option>
-                  {availableModels.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-300 text-sm mb-1">Context Window (tokens)</label>
-                <select
-                  value={settings.ai_context_window}
-                  onChange={(e) => setSettings({ ...settings, ai_context_window: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                >
-                  <option value="2048">2K</option>
-                  <option value="4096">4K</option>
-                  <option value="8192">8K</option>
-                  <option value="16384">16K</option>
-                  <option value="32768">32K</option>
-                  <option value="65536">64K</option>
-                  <option value="128000">128K</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-slate-300 text-sm mb-1">Timeout (seconds)</label>
-                <input
-                  type="number"
-                  value={settings.ai_timeout}
-                  onChange={(e) => setSettings({ ...settings, ai_timeout: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-300 text-sm mb-1">Keep Model Loaded (seconds)</label>
-                <select
-                  value={settings.ai_keep_loaded}
-                  onChange={(e) => setSettings({ ...settings, ai_keep_loaded: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                >
-                  <option value="-1"> Forever (-1)</option>
-                  <option value="60">1 minute</option>
-                  <option value="300">5 minutes</option>
-                  <option value="600">10 minutes</option>
-                  <option value="1800">30 minutes</option>
-                  <option value="3600">1 hour</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-slate-300 text-sm mb-1">Check Loaded Models</label>
-                <button 
-                  type="button" 
-                  onClick={checkLoadedModels}
-                  disabled={checkingLoaded || settings.ai_provider !== 'ollama'}
-                  className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg"
-                >
-                  {checkingLoaded ? 'Checking...' : 'Check Loaded Models'}
-                </button>
-              </div>
-            </div>
-
-            {loadedModels.length > 0 && (
-              <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
-                <h4 className="text-white font-medium mb-2">Currently Loaded Models</h4>
-                <p className="text-slate-400 text-sm mb-2">Click Unload to immediately remove a model from memory.</p>
-                <div className="space-y-2">
-                  {loadedModels.map(model => (
-                    <div key={model} className="flex justify-between items-center">
-                      <span className="text-slate-300">{model}</span>
-                      <button 
-                        type="button"
-                        onClick={() => unloadModel(model)}
-                        className="px-3 py-1 bg-red-600/20 text-red-400 rounded hover:bg-red-600/40 text-sm"
-                      >
-                        Unload
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(settings.ai_provider === 'openai' || settings.ai_provider === 'anthropic' || settings.ai_provider === 'deepseek') && (
-              <div>
-                <label className="block text-slate-300 text-sm mb-1">API Key</label>
-                <input
-                  type="password"
-                  value={settings.ai_api_key}
-                  onChange={(e) => setSettings({ ...settings, ai_api_key: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                />
-              </div>
-            )}
-
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="adultContent"
-                checked={settings.ai_adult_content === 'true'}
-                onChange={(e) => setSettings({ ...settings, ai_adult_content: e.target.checked ? 'true' : 'false' })}
-                className="w-5 h-5 bg-slate-700 border border-slate-600 rounded"
-              />
-              <label htmlFor="adultContent" className="text-slate-300">
-                Enable adult content (disable AI safety filters)
-              </label>
-            </div>
-
-            {error && <div className="text-red-400 text-sm">{error}</div>}
-            {saved && <div className="text-emerald-400 text-sm">Settings saved!</div>}
-
-            <div className="flex gap-2 mt-4">
-              <button type="button" onClick={testConnection} disabled={loading} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
-                {loading ? 'Testing...' : 'Test Connection'}
+                Ollama Instances
               </button>
-              <button type="submit" disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                {loading ? 'Saving...' : 'Save Settings'}
+              <button
+                onClick={() => setAiActiveTab('roles')}
+                className={`px-4 py-2 rounded-t-lg ${aiActiveTab === 'roles' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Agent Roles
+              </button>
+              <button
+                onClick={() => setAiActiveTab('settings')}
+                className={`px-4 py-2 rounded-t-lg ${aiActiveTab === 'settings' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Settings
               </button>
             </div>
-          </form>
+
+            {aiActiveTab === 'instances' && (
+              <InstancesTabContent />
+            )}
+
+            {aiActiveTab === 'roles' && (
+              <RolesTabContent />
+            )}
+
+            {aiActiveTab === 'settings' && (
+              <SettingsTabContent />
+            )}
+          </div>
         )}
 
         {activeTab === 'users' && (
@@ -1385,6 +1312,312 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+// Sub-tab content components
+function InstancesTabContent() {
+  const [aiInstances, setAiInstances] = useState<OllamaInstance[]>([]);
+  const [aiModels, setAiModels] = useState<AvailableModel[]>([]);
+  const [showInstanceModal, setShowInstanceModal] = useState(false);
+  const [editingInstance, setEditingInstance] = useState<OllamaInstance | null>(null);
+  const [instanceForm, setInstanceForm] = useState({ name: '', base_url: '', description: '' });
+  const [loading, setLoading] = useState(false);
+  const [aiSuccess, setAiSuccess] = useState('');
+
+  useEffect(() => { loadInstances(); }, []);
+
+  async function loadInstances() {
+    try {
+      const res = await fetch('/api/admin/instances');
+      const data = await res.json();
+      setAiInstances(data.instances || []);
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadModels(instanceId: number) {
+    try {
+      const res = await fetch(`/api/admin/models?instance_id=${instanceId}`);
+      const data = await res.json();
+      setAiModels(data.models || []);
+    } catch (e) { console.error(e); }
+  }
+
+  async function checkHealth(instance: OllamaInstance) {
+    try {
+      const res = await fetch(`/api/admin/instances/${instance.id}/health`);
+      const data = await res.json();
+      setAiSuccess(data.status === 'online' ? `Instance ${instance.name} is online` : `Instance ${instance.name} is offline`);
+      loadInstances();
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess(`Failed to check health`);
+      setTimeout(() => setAiSuccess(''), 3000);
+    }
+  }
+
+  async function discoverModels(instance: OllamaInstance) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/instances/${instance.id}/discover`, { method: 'POST' });
+      const data = await res.json();
+      setAiSuccess(`Discovered ${data.models?.length || 0} models on ${instance.name}`);
+      loadInstances();
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to discover models');
+      setTimeout(() => setAiSuccess(''), 3000);
+    }
+    setLoading(false);
+  }
+
+  async function saveInstance() {
+    setLoading(true);
+    try {
+      const url = editingInstance ? `/api/admin/instances/${editingInstance.id}` : '/api/admin/instances';
+      const method = editingInstance ? 'PUT' : 'POST';
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(instanceForm),
+      });
+      setAiSuccess(editingInstance ? 'Instance updated' : 'Instance added');
+      loadInstances();
+      setShowInstanceModal(false);
+      setEditingInstance(null);
+      setInstanceForm({ name: '', base_url: '', description: '' });
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to save instance');
+    }
+    setLoading(false);
+  }
+
+  async function deleteInstance(instance: OllamaInstance) {
+    if (!confirm(`Delete ${instance.name}?`)) return;
+    try {
+      await fetch(`/api/admin/instances/${instance.id}`, { method: 'DELETE' });
+      setAiSuccess('Instance deleted');
+      loadInstances();
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to delete');
+    }
+  }
+
+  return (
+    <div>
+      {aiSuccess && <div className="mb-4 p-3 bg-emerald-900/30 text-emerald-400 rounded-lg">{aiSuccess}</div>}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => { setShowInstanceModal(true); setEditingInstance(null); setInstanceForm({ name: '', base_url: '', description: '' }); }}
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+        >
+          Add Instance
+        </button>
+      </div>
+      <div className="space-y-2">
+        {aiInstances.length === 0 ? (
+          <p className="text-slate-400">No Ollama instances configured. Add one to get started.</p>
+        ) : (
+          aiInstances.map(instance => (
+            <div key={instance.id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
+              <div>
+                <div className="text-white font-medium">{instance.name}</div>
+                <div className="text-slate-400 text-sm">{instance.base_url}</div>
+                <div className="text-slate-500 text-xs">
+                  Status: {instance.health_status || 'unknown'} | Last check: {instance.last_health_check ? new Date(instance.last_health_check).toLocaleString() : 'never'}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => checkHealth(instance)} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Check</button>
+                <button onClick={() => discoverModels(instance)} disabled={loading} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Discover</button>
+                <button onClick={() => { setEditingInstance(instance); setInstanceForm({ name: instance.name, base_url: instance.base_url, description: instance.description || '' }); setShowInstanceModal(true); }} className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">Edit</button>
+                <button onClick={() => deleteInstance(instance)} className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-500">Delete</button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      {showInstanceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-white mb-4">{editingInstance ? 'Edit Instance' : 'Add Ollama Instance'}</h3>
+            <div className="space-y-4">
+              <div><label className="block text-slate-300 text-sm mb-1">Name</label><input type="text" value={instanceForm.name} onChange={(e) => setInstanceForm({ ...instanceForm, name: e.target.value })} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" placeholder="Local Ollama" /></div>
+              <div><label className="block text-slate-300 text-sm mb-1">Base URL</label><input type="text" value={instanceForm.base_url} onChange={(e) => setInstanceForm({ ...instanceForm, base_url: e.target.value })} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" placeholder="http://localhost:11434" /></div>
+              <div><label className="block text-slate-300 text-sm mb-1">Description</label><textarea value={instanceForm.description} onChange={(e) => setInstanceForm({ ...instanceForm, description: e.target.value })} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" rows={3} placeholder="Optional..." /></div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => { setShowInstanceModal(false); setEditingInstance(null); setInstanceForm({ name: '', base_url: '', description: '' }); }} className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500">Cancel</button>
+              <button onClick={saveInstance} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RolesTabContent() {
+  const [aiRoles, setAiRoles] = useState<AgentRole[]>([]);
+  const [expandedRole, setExpandedRole] = useState<number | null>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testingRole, setTestingRole] = useState('');
+  const [testPrompt, setTestPrompt] = useState('');
+  const [testResult, setTestResult] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [aiSuccess, setAiSuccess] = useState('');
+
+  useEffect(() => { loadRoles(); }, []);
+
+  async function loadRoles() {
+    try {
+      const res = await fetch('/api/admin/roles');
+      const data = await res.json();
+      setAiRoles(data.roles || []);
+    } catch (e) { console.error(e); }
+  }
+
+  async function runTestAgent() {
+    if (!testPrompt) return;
+    setTesting(true);
+    try {
+      const res = await fetch('/api/admin/ai-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role_key: testingRole, prompt: testPrompt }),
+      });
+      const data = await res.json();
+      setTestResult(data.content || data.error || 'No response');
+    } catch (e) {
+      setTestResult('Error calling AI');
+    }
+    setTesting(false);
+  }
+
+  async function activatePrompt(roleId: number, promptId: number) {
+    try {
+      const res = await fetch(`/api/admin/prompts/${roleId}/activate/${promptId}`, { method: 'POST' });
+      if (res.ok) {
+        setAiSuccess('Prompt activated');
+        loadRoles();
+        setTimeout(() => setAiSuccess(''), 3000);
+      }
+    } catch (e) {
+      setAiSuccess('Failed to activate');
+    }
+  }
+
+  return (
+    <div>
+      {aiSuccess && <div className="mb-4 p-3 bg-emerald-900/30 text-emerald-400 rounded-lg">{aiSuccess}</div>}
+      <div className="space-y-2">
+        {aiRoles.length === 0 ? (
+          <p className="text-slate-400">No agent roles configured.</p>
+        ) : (
+          aiRoles.map(role => (
+            <div key={role.id} className="bg-slate-700/50 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setExpandedRole(expandedRole === role.id ? null : role.id)}>
+                <div>
+                  <div className="text-white font-medium">{role.icon} {role.display_name}</div>
+                  <div className="text-slate-400 text-sm">{role.description}</div>
+                </div>
+                <div className="text-slate-400">{expandedRole === role.id ? '▼' : '▶'}</div>
+              </div>
+              {expandedRole === role.id && (
+                <div className="px-4 pb-4 border-t border-slate-600">
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => { setTestingRole(role.role_key); setShowTestModal(true); }} className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">Test Agent</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+      {showTestModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Test AI Agent ({testingRole})</h3>
+            <div className="space-y-4">
+              <div><label className="block text-slate-300 text-sm mb-1">Test Prompt</label><textarea value={testPrompt} onChange={(e) => setTestPrompt(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" rows={4} placeholder="Enter test prompt..." /></div>
+              {testResult && <div><label className="block text-slate-300 text-sm mb-1">Response</label><div className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 whitespace-pre-wrap max-h-64 overflow-y-auto">{testResult}</div></div>}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => { setShowTestModal(false); setTestPrompt(''); setTestResult(''); }} className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500">Close</button>
+              <button onClick={runTestAgent} disabled={testing || !testPrompt} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{testing ? 'Testing...' : 'Run Test'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SettingsTabContent() {
+  const [aiAppSettings, setAiAppSettings] = useState<AppSetting[]>([]);
+  const [aiSuccess, setAiSuccess] = useState('');
+  const [editingKey, setEditingKey] = useState('');
+  const [editValue, setEditValue] = useState('');
+
+  useEffect(() => { loadSettings(); }, []);
+
+  async function loadSettings() {
+    try {
+      const res = await fetch('/api/admin/app-settings');
+      const data = await res.json();
+      setAiAppSettings(data.settings || []);
+    } catch (e) { console.error(e); }
+  }
+
+  async function saveSetting(key: string) {
+    try {
+      await fetch(`/api/admin/app-settings/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: editValue }),
+      });
+      setAiSuccess(`Setting ${key} updated`);
+      loadSettings();
+      setEditingKey('');
+      setEditValue('');
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to save');
+    }
+  }
+
+  return (
+    <div>
+      {aiSuccess && <div className="mb-4 p-3 bg-emerald-900/30 text-emerald-400 rounded-lg">{aiSuccess}</div>}
+      <div className="space-y-2">
+        {aiAppSettings.length === 0 ? (
+          <p className="text-slate-400">No settings configured.</p>
+        ) : (
+          aiAppSettings.map(setting => (
+            <div key={setting.key} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
+              {editingKey === setting.key ? (
+                <div className="flex-1 flex gap-2">
+                  <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="flex-1 px-3 py-1 bg-slate-600 border border-slate-500 rounded text-white" />
+                  <button onClick={() => saveSetting(setting.key)} className="px-3 py-1 bg-purple-600 text-white text-sm rounded">Save</button>
+                  <button onClick={() => setEditingKey('')} className="px-3 py-1 bg-slate-600 text-white text-sm rounded">Cancel</button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div className="text-white font-mono">{setting.key}</div>
+                    <div className="text-slate-400 text-sm">{setting.value}</div>
+                    {setting.description && <div className="text-slate-500 text-xs">{setting.description}</div>}
+                  </div>
+                  <button onClick={() => { setEditingKey(setting.key); setEditValue(setting.value); }} className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500">Edit</button>
+                </>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
