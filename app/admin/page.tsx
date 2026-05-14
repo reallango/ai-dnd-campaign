@@ -1612,7 +1612,7 @@ function RolesTabContent() {
       const res = await fetch('/api/admin/ai-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_key: testingRole, prompt: testPrompt }),
+        body: JSON.stringify({ roleKey: testingRole, testPrompt: testPrompt }),
       });
       const data = await res.json();
       setTestResult(data.content || data.error || 'No response');
