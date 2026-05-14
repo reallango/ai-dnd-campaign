@@ -1346,7 +1346,7 @@ function InstancesTabContent() {
 
   async function checkHealth(instance: OllamaInstance) {
     try {
-      const res = await fetch(`/api/admin/instances/${instance.id}/health`);
+      const res = await fetch(`/api/admin/instances/${instance.id}/health`, { method: 'POST' });
       const data = await res.json();
       setAiSuccess(data.status === 'online' ? `Instance ${instance.name} is online` : `Instance ${instance.name} is offline`);
       loadInstances();
