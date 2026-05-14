@@ -344,11 +344,21 @@ export default function OneShotPage() {
     const canCreateChar = newCharName.trim().length > 0;
     
     return (
-      <div className="min-h-screen bg-slate-900">
+     <div className="min-h-screen bg-slate-900">
         <header className="bg-slate-800 border-b border-slate-700">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold text-gold">⚔️ Choose Your Character</h1>
-            <p className="text-slate-400">Select or create a character for your adventure</p>
+          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gold">⚔️ Choose Your Character</h1>
+              <p className="text-slate-400">Select or create a character for your adventure</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setStep('theme')} className="btn btn-secondary text-sm">
+                ← Back
+              </button>
+              <button onClick={() => router.push('/dashboard')} className="btn btn-secondary text-sm">
+                Dashboard
+              </button>
+            </div>
           </div>
         </header>
         
