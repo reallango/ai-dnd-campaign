@@ -1362,8 +1362,9 @@ function InstancesTabContent() {
     try {
       const res = await fetch(`/api/admin/instances/${instance.id}/discover`, { method: 'POST' });
       const data = await res.json();
-      setAiSuccess(`Discovered ${data.models?.length || 0} models on ${instance.name}`);
+      setAiSuccess(`Discovered ${data.discovered || 0} models on ${instance.name}`);
       loadInstances();
+      await loadModels(instance.id);
       setTimeout(() => setAiSuccess(''), 3000);
     } catch (e) {
       setAiSuccess('Failed to discover models');
