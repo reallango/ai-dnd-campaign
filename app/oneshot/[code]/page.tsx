@@ -140,7 +140,7 @@ export default function OneShotGamePage() {
       const narrativesRes = await fetch(`/api/narratives/${campaignId}`);
       const narrativesData = await narrativesRes.json();
       if (narrativesData.narratives) {
-        setNarratives(narrativesData.narratives);
+        setNarratives(narrativesData.narratives.reverse());
       }
       
       // Load dice rolls
@@ -239,7 +239,7 @@ C. Third choice
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
-          setNarratives(prev => [saved.narrative, ...prev]);
+          setNarratives(prev => [...prev, saved.narrative]);
         }
         
         // Parse and show choices
@@ -302,7 +302,7 @@ C. Third choice
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
-          setNarratives(prev => [saved.narrative, ...prev]);
+          setNarratives(prev => [...prev, saved.narrative]);
         }
         
         // Parse choices
@@ -364,7 +364,7 @@ C. Third choice
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
-          setNarratives(prev => [saved.narrative, ...prev]);
+          setNarratives(prev => [...prev, saved.narrative]);
         }
         
         const parsed = parseAIResponse(data.content);
