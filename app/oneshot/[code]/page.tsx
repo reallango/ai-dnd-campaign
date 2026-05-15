@@ -153,7 +153,7 @@ export default function OneShotGamePage() {
         const loaded = narrativesData.narratives;
         setNarratives(loaded);
 
-        const latestAI = loaded.find(n => n.type === 'ai');
+        const latestAI = loaded.find((n: NarrativeEntry) => n.type === 'ai');
         if (latestAI) {
           setCurrentNarrative(latestAI.content);
 
