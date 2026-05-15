@@ -5,6 +5,7 @@ import { OllamaClient, createOllamaClient } from './ollama-client';
 import { discoverModels, discoverAllModels, getAvailableModels, getAllAvailableModels } from './discovery';
 import { checkInstanceHealth, checkAllInstancesHealth, startHealthChecks, stopHealthChecks, restartHealthChecks } from './health';
 import { buildContext, formatGameContext } from './context';
+import { orchestrate } from './orchestrator';
 import type { OllamaInstance, AvailableModel, AgentRole, RoleAssignment, RoleParameters, SystemPrompt, AppSetting, ResolvedAgent, GameContext, AIConfig, AIRequest, AIResponse } from './types';
 import db from '@/lib/db';
 
@@ -93,6 +94,9 @@ export {
 
 // Re-export context
 export { buildContext, formatGameContext } from './context';
+
+// Re-export orchestrator
+export { orchestrate } from './orchestrator';
 
 // Types
 export * from './types';

@@ -1681,6 +1681,15 @@ function RolesTabContent() {
   return (
     <div>
       {aiSuccess && <div className="mb-4 p-3 bg-emerald-900/30 text-emerald-400 rounded-lg">{aiSuccess}</div>}
+      <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-4 mb-6">
+        <h4 className="text-blue-300 font-semibold mb-2">🎯 Multi-Agent Orchestration</h4>
+        <p className="text-sm text-slate-400">
+          The <strong className="text-slate-300">Dungeon Master</strong> agent classifies every player action and routes it to the appropriate specialist agent. 
+          Assign a <strong className="text-slate-300">small, fast model</strong> to the DM for quick classification, and <strong className="text-slate-300">larger creative models</strong> to Narrator, Combat, and NPC agents.
+          The <strong className="text-slate-300">State Manager</strong> runs automatically after each turn to track game state changes.
+          Any agent without a model assigned will fall back to the DM's model.
+        </p>
+      </div>
       <div className="space-y-2">
         {aiRoles.length === 0 ? (
           <p className="text-slate-400">No agent roles configured.</p>
