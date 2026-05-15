@@ -105,10 +105,25 @@ export async function DELETE(
     if (campaign.owner_id !== session.id) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
-    
-    db.prepare('DELETE FROM campaigns WHERE code = ?').run(code);
+
+    // Cascade delete child records using a transaction
+    const deleteCampaign = db.transaction((campaignId: number, campaignCode: string, ownerId: number) => {
+      // Try to delete dice_rolls if table exists
+      try {
+        db.prepare('DELETE FROM dice_rolls WHERE campaign_id = ?').run(campaignId);
+      } catch (e) {
+        // Table might not exist, that's fine
+      }
+      db.prepare('DELETE FROM narrative_logs WHERE session_id IN (SELECT id FROM sessions WHERE campaign_id = ?)').run(campaignId);
+      db.prepare('DELETE FROM players WHERE campaign_id = ?').run(campaignId);
+      db.prepare('DELETE FROM sessions WHERE campaign_id = ?').run(campaignId);
+      db.prepare('DELETE FROM campaigns WHERE code = ? AND owner_id = ?').run(campaignCode, ownerId);
+    });
+
+    deleteCampaign(campaign.id, code, session.id);
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('Error deleting campaign:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
