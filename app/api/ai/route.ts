@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     if (type === 'direct' && body.roleKey) {
       // Direct mode: bypass orchestrator, call specific agent (used by admin test)
       const result = await routeTask(body.roleKey, prompt, 
-        campaignId ? { campaignId: parseInt(campaignId), sessionId: sessionId ? parseInt(sessionId) : undefined }, 
+        campaignId ? { campaignId: parseInt(campaignId), sessionId: sessionId ? parseInt(sessionId) : undefined } : undefined, 
         undefined, maxTokens);
       return NextResponse.json({
         content: result.content,
