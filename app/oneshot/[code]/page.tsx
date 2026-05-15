@@ -150,7 +150,7 @@ export default function OneShotGamePage() {
       const narrativesRes = await fetch(`/api/narratives/${campaignId}`);
       const narrativesData = await narrativesRes.json();
       if (narrativesData.narratives) {
-        setNarratives(narrativesData.narratives.reverse());
+        setNarratives(narrativesData.narratives);
       }
       
       const diceRes = await fetch(`/api/dice?campaignId=${campaignId}&limit=20`);
@@ -251,7 +251,7 @@ C. Third choice
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
-          setNarratives(prev => [...prev, saved.narrative]);
+          setNarratives(prev => [saved.narrative, ...prev]);
         }
       } else {
         setError(data.error || 'Failed to generate opening scene');
@@ -310,7 +310,7 @@ C. Third choice
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
-          setNarratives(prev => [...prev, saved.narrative]);
+          setNarratives(prev => [saved.narrative, ...prev]);
         }
       } else {
         setError(data.error || 'Failed to continue adventure');
@@ -370,7 +370,7 @@ C. Third choice
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
-          setNarratives(prev => [...prev, saved.narrative]);
+          setNarratives(prev => [saved.narrative, ...prev]);
         }
       } else {
         setError(data.error || 'Failed to continue adventure');
