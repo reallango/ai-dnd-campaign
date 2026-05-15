@@ -1571,6 +1571,28 @@ function RolesTabContent() {
     setSaving(false);
   }
 
+  async function removeAssignment(roleId: number, priority: number = 1) {
+    setSaving(true);
+    try {
+      const existingRes = await fetch(`/api/admin/assignments?role_id=${roleId}`);
+      const existingData = await existingRes.json();
+      const assignments = existingData.assignments || [];
+      const existing = assignments.find((a: any) => a.priority === priority);
+      
+      if (existing) {
+        await fetch(`/api/admin/assignments/${existing.id}`, {
+          method: 'DELETE',
+        });
+      }
+      setAiSuccess('Assignment removed');
+      loadRoles();
+      setTimeout(() => setAiSuccess(''), 3000);
+    } catch (e) {
+      setAiSuccess('Failed to remove assignment');
+    }
+    setSaving(false);
+  }
+
   async function saveNewPromptVersion(roleId: number) {
     const promptText = editPromptTexts[roleId] || '';
     const notes = editPromptNotesMap[roleId] || '';
@@ -1700,12 +1722,17 @@ function RolesTabContent() {
                         <select
                           value={getCurrentAssignment(role.id, 1)?.model_id || ''}
                           onChange={(e) => {
-                            if (e.target.value) saveAssignment(role.id, parseInt(e.target.value), 1);
+                            if (e.target.value === '__clear__') {
+                              removeAssignment(role.id, 1);
+                            } else if (e.target.value) {
+                              saveAssignment(role.id, parseInt(e.target.value), 1);
+                            }
                           }}
                           disabled={saving}
                           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
                         >
                           <option value="">Select model...</option>
+                          <option value="__clear__">None (use fallback)</option>
                           {Object.entries(getModelsGroupedByInstance()).map(([instanceName, models]) => (
                             <optgroup key={instanceName} label={instanceName}>
                               {models.map(model => (
@@ -1722,12 +1749,17 @@ function RolesTabContent() {
                         <select
                           value={getCurrentAssignment(role.id, 2)?.model_id || ''}
                           onChange={(e) => {
-                            if (e.target.value) saveAssignment(role.id, parseInt(e.target.value), 2);
+                            if (e.target.value === '__clear__') {
+                              removeAssignment(role.id, 2);
+                            } else if (e.target.value) {
+                              saveAssignment(role.id, parseInt(e.target.value), 2);
+                            }
                           }}
                           disabled={saving}
                           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
                         >
                           <option value="">Select fallback...</option>
+                          <option value="__clear__">None</option>
                           {Object.entries(getModelsGroupedByInstance()).map(([instanceName, models]) => (
                             <optgroup key={instanceName} label={instanceName}>
                               {models.map(model => (

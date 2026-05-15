@@ -7,19 +7,39 @@ import type { RoleAssignment } from '@/lib/ai/types';
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const roleIdParam = searchParams.get('role_id');
     const database = db as any;
     
-    const assignments = database.prepare(`
-      SELECT ra.*, 
-             ar.role_key, ar.display_name as role_display_name,
-             am.model_tag, am.display_name as model_display_name,
-             oi.name as instance_name
-      FROM role_assignments ra
-      JOIN agent_roles ar ON ra.role_id = ar.id
-      JOIN available_models am ON ra.model_id = am.id
-      JOIN ollama_instances oi ON am.instance_id = oi.id
-      ORDER BY ar.sort_order, ra.priority
-    `).all();
+    let assignments;
+    if (roleIdParam) {
+      // Filter by role_id if provided
+      assignments = database.prepare(`
+        SELECT ra.*, 
+               ar.role_key, ar.display_name as role_display_name,
+               am.model_tag, am.display_name as model_display_name,
+               oi.name as instance_name
+        FROM role_assignments ra
+        JOIN agent_roles ar ON ra.role_id = ar.id
+        JOIN available_models am ON ra.model_id = am.id
+        JOIN ollama_instances oi ON am.instance_id = oi.id
+        WHERE ra.role_id = ?
+        ORDER BY ra.priority
+      `).all(parseInt(roleIdParam));
+    } else {
+      // Return all assignments (existing behavior)
+      assignments = database.prepare(`
+        SELECT ra.*, 
+               ar.role_key, ar.display_name as role_display_name,
+               am.model_tag, am.display_name as model_display_name,
+               oi.name as instance_name
+        FROM role_assignments ra
+        JOIN agent_roles ar ON ra.role_id = ar.id
+        JOIN available_models am ON ra.model_id = am.id
+        JOIN ollama_instances oi ON am.instance_id = oi.id
+        ORDER BY ar.sort_order, ra.priority
+      `).all();
+    }
 
     return NextResponse.json({ assignments });
   } catch (error) {
