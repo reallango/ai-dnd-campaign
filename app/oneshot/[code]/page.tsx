@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 interface Campaign {
@@ -38,12 +38,17 @@ interface DiceRoll {
 
 // Parse AI response to extract narrative and choices
 function parseAIResponse(content: string): { narrative: string; choices: string[] } {
-  const narrativeMatch = content.match(/\[NARRATIVE\]([\s\S]*?)\[\/NARRATIVE\]/);
-  const choicesMatch = content.match(/\[CHOICES\]([\s\S]*?)\[\/CHOICES\]/);
-  
-  let narrative = narrativeMatch ? narrativeMatch[1].trim() : content;
+  let narrative = content;
   let choices: string[] = [];
   
+  // Try to extract [NARRATIVE]...[/NARRATIVE] (closing tag optional)
+  const narrativeMatch = content.match(/\[NARRATIVE\]([\s\S]*?)(?:\[\/NARRATIVE\]|\[CHOICES\]|$)/);
+  if (narrativeMatch) {
+    narrative = narrativeMatch[1].trim();
+  }
+  
+  // Try to extract [CHOICES]...[/CHOICES] (closing tag optional)
+  const choicesMatch = content.match(/\[CHOICES\]([\s\S]*?)(?:\[\/CHOICES\]|$)/);
   if (choicesMatch) {
     choices = choicesMatch[1].trim().split('\n')
       .map(c => c.trim())
@@ -51,17 +56,23 @@ function parseAIResponse(content: string): { narrative: string; choices: string[
       .map(c => c.replace(/^[A-Z]\.\s*/, ''));
   }
   
-  // Fallback: if no tags found, try to split on common patterns
-  if (!narrativeMatch && !choicesMatch) {
+  // If no [NARRATIVE] tag, strip any [CHOICES] block from the narrative
+  if (!narrativeMatch && choicesMatch) {
+    narrative = content.replace(/\[CHOICES\][\s\S]*$/, '').trim();
+  }
+  
+  // Fallback: look for A., B., C., D. patterns at end of content
+  if (choices.length === 0) {
     const lines = content.split('\n');
     const choiceLines: string[] = [];
     const narrativeLines: string[] = [];
     let inChoices = false;
     
     for (const line of lines) {
-      if (line.trim().match(/^[A-D]\.\s/)) {
+      const trimmed = line.trim();
+      if (trimmed.match(/^[A-D]\.\s/) || trimmed.match(/^\d+\.\s/)) {
         inChoices = true;
-        choiceLines.push(line.trim().replace(/^[A-D]\.\s*/, ''));
+        choiceLines.push(trimmed.replace(/^[A-D]\.\s*/, '').replace(/^\d+\.\s*/, ''));
       } else if (!inChoices) {
         narrativeLines.push(line);
       }
@@ -72,6 +83,14 @@ function parseAIResponse(content: string): { narrative: string; choices: string[
       choices = choiceLines;
     }
   }
+  
+  // Clean any remaining tags from narrative
+  narrative = narrative
+    .replace(/\[NARRATIVE\]/g, '')
+    .replace(/\[\/NARRATIVE\]/g, '')
+    .replace(/\[CHOICES\]/g, '')
+    .replace(/\[\/CHOICES\]/g, '')
+    .trim();
   
   return { narrative, choices };
 }
@@ -84,7 +103,8 @@ export default function OneShotGamePage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
   const [narratives, setNarratives] = useState<NarrativeEntry[]>([]);
-  const [choices, setChoices] = useState<string[]>([]);
+  const [currentNarrative, setCurrentNarrative] = useState('');
+  const [currentChoices, setCurrentChoices] = useState<string[]>([]);
   const [diceRolls, setDiceRolls] = useState<DiceRoll[]>([]);
   const [lastDice, setLastDice] = useState<{ dice: string; result: number } | null>(null);
   
@@ -97,24 +117,17 @@ export default function OneShotGamePage() {
   const [diceLabel, setDiceLabel] = useState('');
   const [showDiceResult, setShowDiceResult] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'character' | 'inventory' | 'story'>('character');
+  const [activeTab, setActiveTab] = useState<'character' | 'inventory' | 'log'>('character');
+  const [expandedLogEntry, setExpandedLogEntry] = useState<number | null>(null);
   
-  const narrativesEndRef = useRef<HTMLDivElement>(null);
+  const hasOpening = narratives.length > 0;
   
   useEffect(() => {
     loadCampaignData();
   }, [code]);
   
-  useEffect(() => {
-    // Scroll to bottom when narratives change
-    if (narrativesEndRef.current) {
-      narrativesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [narratives]);
-  
   const loadCampaignData = async () => {
     try {
-      // Load campaign
       const campaignRes = await fetch(`/api/campaigns/${code}`);
       const campaignData = await campaignRes.json();
       if (!campaignData.campaign) {
@@ -124,26 +137,22 @@ export default function OneShotGamePage() {
       setCampaign(campaignData.campaign);
       const campaignId = campaignData.campaign.id;
       
-      // Load AI status
       const aiRes = await fetch('/api/ai');
       const aiData = await aiRes.json();
       setAiStatus(aiData);
       
-      // Load player
       const playersRes = await fetch(`/api/players?campaignId=${campaignId}`);
       const playersData = await playersRes.json();
       if (playersData.players && playersData.players.length > 0) {
         setPlayer(playersData.players[0]);
       }
       
-      // Load narratives
       const narrativesRes = await fetch(`/api/narratives/${campaignId}`);
       const narrativesData = await narrativesRes.json();
       if (narrativesData.narratives) {
         setNarratives(narrativesData.narratives);
       }
       
-      // Load dice rolls
       const diceRes = await fetch(`/api/dice?campaignId=${campaignId}&limit=20`);
       const diceData = await diceRes.json();
       if (diceData.rolls) {
@@ -163,10 +172,10 @@ export default function OneShotGamePage() {
     
     try {
       const themeDesc = campaign.description || 'A solo adventure';
-      let prompt = '';
+      let promptText = '';
       
       if (campaign.name.startsWith('Mystery') || campaign.name.startsWith('Surprise')) {
-        prompt = `Begin a new D&D one-shot adventure. Choose a creative and unexpected theme that will surprise the player. Make it unique and memorable. The player character is ${player.name}, a level ${player.level || 1} ${player.race} ${player.class} with background ${player.background}.
+        promptText = `Begin a new D&D one-shot adventure. Choose a creative and unexpected theme that will surprise the player. Make it unique and memorable. The player character is ${player.name}, a level ${player.level || 1} ${player.race} ${player.class} with background ${player.background}.
 
 Generate an immersive opening scene that:
 1. Sets the atmosphere and location
@@ -183,7 +192,7 @@ B. Second choice
 C. Third choice
 [/CHOICES]`;
       } else if (campaign.name.startsWith('Custom')) {
-        prompt = `Begin a new D&D one-shot adventure based on the player's request: ${themeDesc}. Build a world and scenario around this concept. The player character is ${player.name}, a level ${player.level || 1} ${player.race} ${player.class} with background ${player.background}.
+        promptText = `Begin a new D&D one-shot adventure based on the player's request: ${themeDesc}. Build a world and scenario around this concept. The player character is ${player.name}, a level ${player.level || 1} ${player.race} ${player.class} with background ${player.background}.
 
 Generate an immersive opening scene that:
 1. Sets the atmosphere and location
@@ -200,7 +209,7 @@ B. Second choice
 C. Third choice
 [/CHOICES]`;
       } else {
-        prompt = `Begin a new D&D one-shot adventure. The theme is: ${themeDesc}. The player character is ${player.name}, a level ${player.level || 1} ${player.race} ${player.class} with background ${player.background}.
+        promptText = `Begin a new D&D one-shot adventure. The theme is: ${themeDesc}. The player character is ${player.name}, a level ${player.level || 1} ${player.race} ${player.class} with background ${player.background}.
 
 Generate an immersive opening scene that:
 1. Sets the atmosphere and location
@@ -221,30 +230,29 @@ C. Third choice
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, type: 'narrative', campaignId: campaign.id }),
+        body: JSON.stringify({ prompt: promptText, type: 'narrative', campaignId: campaign.id }),
       });
       
       const data = await response.json();
       
       if (data.content) {
-        // Save AI narrative
+        const parsed = parseAIResponse(data.content);
+        setCurrentNarrative(parsed.narrative);
+        setCurrentChoices(parsed.choices);
+        
         const saveRes = await fetch(`/api/narratives/${campaign.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'ai',
-            content: data.content,
-            metadata: { prompt },
+            content: parsed.narrative,
+            metadata: { fullResponse: data.content, choices: parsed.choices },
           }),
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
           setNarratives(prev => [saved.narrative, ...prev]);
         }
-        
-        // Parse and show choices
-        const parsed = parseAIResponse(data.content);
-        setChoices(parsed.choices);
       } else {
         setError(data.error || 'Failed to generate opening scene');
       }
@@ -262,7 +270,6 @@ C. Third choice
     setError('');
     
     try {
-      // Save player action
       await fetch(`/api/narratives/${campaign.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,10 +280,8 @@ C. Third choice
         }),
       });
       
-      // Clear choices while processing
-      setChoices([]);
+      setCurrentChoices([]);
       
-      // Generate AI response
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -290,24 +295,23 @@ C. Third choice
       const data = await response.json();
       
       if (data.content) {
-        // Save AI response
+        const parsed = parseAIResponse(data.content);
+        setCurrentNarrative(parsed.narrative);
+        setCurrentChoices(parsed.choices);
+        
         const saveRes = await fetch(`/api/narratives/${campaign.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'ai',
-            content: data.content,
-            metadata: {},
+            content: parsed.narrative,
+            metadata: { fullResponse: data.content, choices: parsed.choices },
           }),
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
           setNarratives(prev => [saved.narrative, ...prev]);
         }
-        
-        // Parse choices
-        const parsed = parseAIResponse(data.content);
-        setChoices(parsed.choices);
       } else {
         setError(data.error || 'Failed to continue adventure');
       }
@@ -325,7 +329,6 @@ C. Third choice
     setError('');
     
     try {
-      // Save player action
       await fetch(`/api/narratives/${campaign.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -337,9 +340,8 @@ C. Third choice
       });
       
       setPrompt('');
-      setChoices([]);
+      setCurrentChoices([]);
       
-      // Generate AI response
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -353,22 +355,23 @@ C. Third choice
       const data = await response.json();
       
       if (data.content) {
+        const parsed = parseAIResponse(data.content);
+        setCurrentNarrative(parsed.narrative);
+        setCurrentChoices(parsed.choices);
+        
         const saveRes = await fetch(`/api/narratives/${campaign.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'ai',
-            content: data.content,
-            metadata: {},
+            content: parsed.narrative,
+            metadata: { fullResponse: data.content, choices: parsed.choices },
           }),
         });
         const saved = await saveRes.json();
         if (saved.narrative) {
           setNarratives(prev => [saved.narrative, ...prev]);
         }
-        
-        const parsed = parseAIResponse(data.content);
-        setChoices(parsed.choices);
       } else {
         setError(data.error || 'Failed to continue adventure');
       }
@@ -427,9 +430,6 @@ C. Third choice
     );
   }
   
-  // Generate opening scene if none exist
-  const hasOpening = narratives.some(n => n.type === 'ai');
-  
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
       {/* Header */}
@@ -453,90 +453,74 @@ C. Third choice
         </div>
       </header>
       
-      {/* Main Game Area */}
-      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4">
-        {/* Narrative Log */}
-        <div className="flex-1 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden flex flex-col mb-4">
-          <div className="p-3 bg-slate-900 border-b border-slate-700">
-            <h2 className="text-gold font-semibold">📜 Adventure Log</h2>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {!hasOpening && !loading && (
-              <div className="text-center py-8">
-                <button
-                  onClick={generateOpeningScene}
-                  disabled={!aiStatus.available}
-                  className="btn btn-primary text-lg py-3 px-8 disabled:opacity-50"
-                >
-                  {aiStatus.available ? '⚔️ Begin Adventure' : 'AI not available'}
-                </button>
-                {!aiStatus.available && (
-                  <p className="text-slate-400 mt-2">Configure AI in admin settings</p>
-                )}
-              </div>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 gap-4">
+        {/* Begin Adventure Button (when no opening) */}
+        {!hasOpening && !loading && (
+          <div className="bg-slate-800 rounded-lg p-8 text-center">
+            <button
+              onClick={generateOpeningScene}
+              disabled={!aiStatus.available}
+              className="btn btn-primary text-lg py-3 px-8 disabled:opacity-50"
+            >
+              {aiStatus.available ? '⚔️ Begin Adventure' : 'AI not available'}
+            </button>
+            {!aiStatus.available && (
+              <p className="text-slate-400 mt-2">Configure AI in admin settings</p>
             )}
-            
-            {loading && (
-              <div className="text-center py-4">
-                <div className="loading-spinner mx-auto mb-2" />
-                <p className="text-slate-400">The Dungeon Master is thinking...</p>
-              </div>
-            )}
-            
-            {narratives.map((entry) => (
-              <div
-                key={entry.id}
-                className={`narrative-box ${
-                  entry.type === 'player_action'
-                    ? 'border-l-4 border-l-blue-500 bg-blue-900/20'
-                    : 'bg-tertiary'
-                }`}
-              >
-                {entry.type === 'player_action' && entry.metadata?.characterName && (
-                  <div className="text-blue-400 text-sm font-semibold mb-1">
-                    {entry.metadata.characterName}:
-                  </div>
-                )}
-                <div className="prose prose-invert prose-sm max-w-none">
-                  {entry.content.split('\n').map((line, i) => (
-                    <p key={i} className="mb-1">{line}</p>
-                  ))}
-                </div>
-              </div>
-            ))}
-            
-            <div ref={narrativesEndRef} />
           </div>
-        </div>
+        )}
         
-        {/* Choices or Custom Action Input */}
-        {(choices.length > 0 || !hasOpening) && (
-          <div className="mb-4">
-            {choices.length > 0 && (
-              <div className="space-y-2 mb-4">
-                <p className="text-gold font-semibold">What do you do?</p>
-                {choices.map((choice, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleChoice(choice)}
-                    disabled={loading}
-                    className="choice-option w-full text-left"
-                  >
-                    {String.fromCharCode(65 + index)}. {choice}
-                  </button>
-                ))}
-              </div>
-            )}
-            
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-slate-800 rounded-lg p-8 text-center">
+            <div className="loading-spinner mx-auto mb-2" />
+            <p className="text-slate-400">The Dungeon Master is thinking...</p>
+          </div>
+        )}
+        
+        {/* Current Scene (always visible after adventure starts) */}
+        {hasOpening && currentNarrative && !loading && (
+          <div className="bg-slate-800 rounded-lg border-2 border-slate-600 p-6">
+            <h2 className="text-gold font-semibold text-lg mb-4">📜 Current Scene</h2>
+            <div className="text-slate-200 text-lg whitespace-pre-wrap leading-relaxed">
+              {currentNarrative}
+            </div>
+          </div>
+        )}
+        
+        {/* Choices (if available, always visible after adventure starts) */}
+        {hasOpening && currentChoices.length > 0 && !loading && (
+          <div className="space-y-3">
+            <p className="text-gold font-semibold">Choose an action:</p>
+            {currentChoices.map((choice, index) => (
+              <button
+                key={index}
+                onClick={() => handleChoice(choice)}
+                disabled={loading}
+                className="w-full flex items-center gap-3 p-4 bg-slate-800 border-2 border-slate-600 rounded-lg hover:border-amber-500 hover:bg-slate-700 transition-all disabled:opacity-50 text-left group"
+              >
+                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-600 text-white font-bold text-sm shrink-0 group-hover:bg-amber-500">
+                  {String.fromCharCode(65 + index)}
+                </span>
+                <span className="text-slate-200 group-hover:text-white">{choice}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        
+        {/* Free Text Input (ALWAYS visible after adventure starts) */}
+        {hasOpening && (
+          <div className="bg-slate-800 rounded-lg p-4">
+            <p className="text-gold font-semibold mb-2">Or describe your own action:</p>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCustomAction()}
-                placeholder="Or describe your own action..."
-                className="flex-1 bg-slate-800 text-white p-3 rounded border border-slate-700 focus:border-amber-500 outline-none"
+                placeholder="What do you do? (e.g., 'I search the room for hidden doors')"
+                className="flex-1 bg-slate-900 text-white p-3 rounded border border-slate-700 focus:border-amber-500 outline-none"
                 disabled={loading}
               />
               <button
@@ -550,11 +534,11 @@ C. Third choice
           </div>
         )}
         
-        {error && <p className="text-red-400 text-center mb-4">{error}</p>}
+        {error && <p className="text-red-400 text-center">{error}</p>}
         
         {/* Dice Roller */}
-        <div className="bg-slate-800 rounded-lg p-4 mb-4">
-          <div className="flex items-center gap-4">
+        <div className="bg-slate-800 rounded-lg p-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <span className="text-gold font-semibold">🎲 Dice:</span>
             <input
               type="text"
@@ -588,14 +572,14 @@ C. Third choice
               🎒 Inventory
             </button>
             <button
-              onClick={() => setActiveTab('story')}
-              className={`flex-1 p-3 text-center ${activeTab === 'story' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
+              onClick={() => setActiveTab('log')}
+              className={`flex-1 p-3 text-center ${activeTab === 'log' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
             >
-              📖 Story So Far
+              📜 Adventure Log
             </button>
           </div>
           
-          <div className="p-4">
+          <div className="p-4 max-h-64 overflow-y-auto">
             {activeTab === 'character' && player && (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-4">
@@ -628,13 +612,34 @@ C. Third choice
             {activeTab === 'inventory' && (
               <p className="text-slate-400">Inventory tracking coming soon</p>
             )}
-            {activeTab === 'story' && (
-              <div className="text-slate-300 text-sm space-y-2 max-h-64 overflow-y-auto">
-                {narratives.slice().reverse().map((entry) => (
-                  <div key={entry.id} className="border-b border-slate-700 pb-2">
-                    <span className="text-slate-500">{entry.type === 'player_action' ? '→' : '📜'}</span>{' '}
-                    {entry.content.substring(0, 200)}
-                    {entry.content.length > 200 && '...'}
+            {activeTab === 'log' && (
+              <div className="space-y-0">
+                {narratives.map((entry) => (
+                  <div key={entry.id} className="border-b border-slate-700 last:border-b-0">
+                    <button
+                      onClick={() => setExpandedLogEntry(
+                        expandedLogEntry === entry.id ? null : entry.id
+                      )}
+                      className="w-full flex items-center gap-2 p-3 text-left hover:bg-slate-700/50"
+                    >
+                      <span>{entry.type === 'player_action' ? '⚔️' : '📜'}</span>
+                      <span className="flex-1 text-slate-300 truncate text-sm">
+                        {entry.content.replace(/\[NARRATIVE\]|\[\/NARRATIVE\]|\[CHOICES\][\s\S]*/g, '').substring(0, 60)}...
+                      </span>
+                      <span className="text-slate-500 text-xs">
+                        {new Date(entry.created_at).toLocaleTimeString()}
+                      </span>
+                      <span className="text-slate-500">
+                        {expandedLogEntry === entry.id ? '▼' : '▶'}
+                      </span>
+                    </button>
+                    {expandedLogEntry === entry.id && (
+                      <div className="px-4 pb-3 text-slate-300 text-sm whitespace-pre-wrap">
+                        {entry.content.split('\n').map((line, i) => (
+                          <p key={i} className="mb-1">{line}</p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
