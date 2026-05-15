@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showDelete, setShowDelete] = useState<number | null>(null);
+  const [showDelete, setShowDelete] = useState<{ id: number; code: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
@@ -44,12 +44,12 @@ export default function Dashboard() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (campaignData: { id: number; code: string }) => {
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/campaigns/${campaignData.code}`, { method: 'DELETE' });
       if (res.ok) {
-        setCampaigns(campaigns.filter(c => c.id !== id));
+        setCampaigns(campaigns.filter(c => c.id !== campaignData.id));
         setShowDelete(null);
       }
     } catch (e) {
@@ -183,7 +183,7 @@ export default function Dashboard() {
                       Open
                     </button>
                     <button
-                      onClick={() => setShowDelete(campaign.id)}
+                      onClick={() => setShowDelete({ id: campaign.id, code: campaign.code })}
                       className="px-3 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm rounded"
                     >
                       Delete

@@ -7,7 +7,7 @@ export default function CampaignsPage() {
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showDelete, setShowDelete] = useState<number | null>(null);
+  const [showDelete, setShowDelete] = useState<{ id: number; code: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
@@ -26,12 +26,12 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (campaignData: { id: number; code: string }) => {
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/campaigns/${campaignData.code}`, { method: 'DELETE' });
       if (res.ok) {
-        setCampaigns(campaigns.filter(c => c.id !== id));
+        setCampaigns(campaigns.filter(c => c.id !== campaignData.id));
         setShowDelete(null);
       }
     } catch (e) {
@@ -95,7 +95,7 @@ export default function CampaignsPage() {
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-semibold text-white">{campaign.name}</h3>
                   <button
-                    onClick={() => setShowDelete(campaign.id)}
+                    onClick={() => setShowDelete({ id: campaign.id, code: campaign.code })}
                     className="text-red-400 hover:text-red-300"
                   >
                     ✕
