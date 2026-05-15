@@ -150,7 +150,22 @@ export default function OneShotGamePage() {
       const narrativesRes = await fetch(`/api/narratives/${campaignId}`);
       const narrativesData = await narrativesRes.json();
       if (narrativesData.narratives) {
-        setNarratives(narrativesData.narratives);
+        const loaded = narrativesData.narratives;
+        setNarratives(loaded);
+
+        const latestAI = loaded.find(n => n.type === 'ai');
+        if (latestAI) {
+          setCurrentNarrative(latestAI.content);
+
+          if (latestAI.metadata?.choices?.length) {
+            setCurrentChoices(latestAI.metadata.choices);
+          } else {
+            const parsed = parseAIResponse(
+              latestAI.metadata?.fullResponse || latestAI.content
+            );
+            setCurrentChoices(parsed.choices);
+          }
+        }
       }
       
       const diceRes = await fetch(`/api/dice?campaignId=${campaignId}&limit=20`);

@@ -59,6 +59,12 @@ export default function DMDashboard() {
   
   const [mapUrl, setMapUrl] = useState('');
   
+  // Detect if campaign is a One-Shot
+  const isOneShot =
+    campaign?.dm_name === 'AI Dungeon Master' ||
+    campaign?.name?.toLowerCase().includes('one-shot') ||
+    campaign?.name?.toLowerCase().includes('mystery');
+  
   // Load initial data
   const loadCampaignData = useCallback(async () => {
     try {
@@ -208,6 +214,14 @@ export default function DMDashboard() {
               <div className={`w-2 h-2 rounded-full ${aiStatus.available ? 'bg-success' : 'bg-error'}`} />
               <span className="text-muted text-sm">{aiStatus.provider || 'AI'}</span>
             </div>
+            {isOneShot && (
+              <button
+                onClick={() => router.push(`/oneshot/${campaign.code}`)}
+                className="btn btn-primary text-sm"
+              >
+                ▶ Continue Adventure
+              </button>
+            )}
             <button onClick={() => router.push('/dashboard')} className="btn btn-secondary text-sm">
               ← Dashboard
             </button>
