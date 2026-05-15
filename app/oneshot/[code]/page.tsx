@@ -120,7 +120,7 @@ export default function OneShotGamePage() {
   const [activeTab, setActiveTab] = useState<'character' | 'inventory' | 'log'>('character');
   const [expandedLogEntry, setExpandedLogEntry] = useState<number | null>(null);
   
-  const hasOpening = narratives.length > 0;
+  const hasOpening = narratives.some(n => n.type === 'ai');
   
   useEffect(() => {
     loadCampaignData();
