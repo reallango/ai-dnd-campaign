@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     
     // Parse character_data for each character
     const result = characters.map((char: any) => {
-      let charData = {};
+      let charData: any = {};
       try {
         charData = char.character_data ? JSON.parse(char.character_data) : {};
       } catch (e) {}

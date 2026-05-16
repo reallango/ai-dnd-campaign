@@ -1,1 +1,1 @@
-export const BUILD_HASH: string = '793ad08'
+export const BUILD_HASH: string = '6a5d7d2'

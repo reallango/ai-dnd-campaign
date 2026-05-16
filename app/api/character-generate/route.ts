@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Fetch system context if provided
     let systemConfig: any = {};
     let characterSchema: any = null;
-    let aiContext = '';
+    let aiContext: any = '';
     
     if (game_system_id) {
       // Get system config

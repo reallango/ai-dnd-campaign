@@ -80,14 +80,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Invalid system ID' }, { status: 400 });
     }
     
-    const system = db.prepare('SELECT * FROM game_systems WHERE id = ?').get(systemId);
+    const system: any = db.prepare('SELECT * FROM game_systems WHERE id = ?').get(systemId);
     
     if (!system) {
       return NextResponse.json({ error: 'Game system not found' }, { status: 404 });
     }
     
     // Check if any campaigns reference this system
-    const campaignsUsing = db.prepare(`
+    const campaignsUsing: any = db.prepare(`
       SELECT id FROM campaigns WHERE game_system = ? OR game_system = ?
     `).all(system.system_key, system.name);
     

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Invalid character ID' }, { status: 400 });
     }
     
-    const character = db.prepare(`
+    const character: any = db.prepare(`
       SELECT c.*, gs.name as game_system_name, gs.system_key, gs.config as game_system_config
       FROM characters c
       LEFT JOIN game_systems gs ON c.game_system_id = gs.id
@@ -25,13 +25,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
     
     // Parse character_data
-    let charData = {};
+    let charData: any = {};
     try {
       charData = character.character_data ? JSON.parse(character.character_data) : {};
     } catch (e) {}
     
     // Parse system config
-    let sysConfig = {};
+    let sysConfig: any = {};
     try {
       sysConfig = character.game_system_config ? JSON.parse(character.game_system_config) : {};
     } catch (e) {}

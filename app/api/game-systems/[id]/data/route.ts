@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'category parameter required' }, { status: 400 });
     }
     
-    const row = db.prepare(`
+    const row: any = db.prepare(`
       SELECT * FROM game_system_data 
       WHERE system_id = ? AND category = ?
     `).get(systemId, category);

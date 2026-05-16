@@ -133,7 +133,7 @@ export function resolveAgent(roleKey: string): ResolvedAgent | null {
 export async function routeTask(
   roleKey: string,
   userPrompt: string,
-  gameContext?: { campaignId: number; sessionId?: number },
+  gameContext?: { campaignId: number; sessionId?: number; gameSystemId?: number },
   overrideParams?: Partial<RoleParameters>,
   maxTokens?: number
 ): Promise<{ content: string; model: string; instance: string }> {

@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       JSON.stringify(config || {})
     );
 
-    const systemId = db.prepare('SELECT last_insert_rowid() as id').get().id;
+    const systemId = (db.prepare('SELECT last_insert_rowid() as id').get() as any).id;
     let categoriesImported = 0;
 
     // Insert each data section
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       categoriesImported++;
     }
 
-    const system = db.prepare('SELECT * FROM game_systems WHERE id = ?').get(systemId);
+    const system: any = db.prepare('SELECT * FROM game_systems WHERE id = ?').get(systemId);
 
     return NextResponse.json({ 
       success: true, 

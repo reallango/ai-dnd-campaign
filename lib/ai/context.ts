@@ -59,7 +59,7 @@ export function buildContext(campaignId: number, sessionId?: number): GameContex
     `).get(campaignId) as { id: number; mode: string } | undefined;
     
     if (!session) {
-      return { campaignId: campaign.id, campaignName: campaign.name, sessionId: 0, mode: 'live', characters: [], recentNarrative: [], sessionNotes: '', gameSystemId: campaign.game_system_id, gameSystemContext };
+      return { campaignId: campaign.id, campaignName: campaign.name, sessionId: 0, mode: 'live', characters: [], recentNarrative: [], sessionNotes: '', gameSystemId: campaign.game_system_id ?? undefined, gameSystemContext };
     }
     
     activeSessionId = session.id;
@@ -122,7 +122,7 @@ export function buildContext(campaignId: number, sessionId?: number): GameContex
     characters,
     recentNarrative,
     sessionNotes: notesRows?.notes || '',
-    gameSystemId: campaign.game_system_id,
+    gameSystemId: campaign.game_system_id ?? undefined,
     gameSystemContext: gameSystemContext
   };
 }
