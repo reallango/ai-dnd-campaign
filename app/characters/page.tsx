@@ -6,71 +6,45 @@ import { useRouter } from 'next/navigation';
 interface Character {
   id: number;
   name: string;
-  race?: string;
-  class?: string;
-  level: number;
-  background?: string;
-  stats?: string;
-  inventory?: string;
-  notes?: string;
-  player_id?: number;
+  game_system_id?: number;
+  game_system_name?: string;
+  creation_mode?: string;
+  portrait_url?: string;
+  is_template?: number;
+  version?: number;
   created_at: string;
+  updated_at: string;
+  summary?: {
+    race?: string;
+    class?: string;
+    level?: number;
+    background?: string;
+  };
+  character_data?: any;
 }
 
 export default function CharacterManager() {
   const router = useRouter();
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-  const [mode, setMode] = useState<'list' | 'create' | 'edit' | 'delete'>('list');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  // Form data
-  const [name, setName] = useState('');
-  const [race, setRace] = useState('');
-  const [charClass, setCharClass] = useState('');
-  const [level, setLevel] = useState(1);
-  const [background, setBackground] = useState('');
-  
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     loadCharacters();
   }, []);
-  
+
   const loadCharacters = async () => {
+    setLoading(true);
     try {
       const res = await fetch('/api/characters');
       const data = await res.json();
       if (data.characters) setCharacters(data.characters);
     } catch (e) {
       console.error('Error:', e);
-    }
-  };
-  
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    
-    setLoading(true);
-    try {
-      const res = await fetch('/api/characters', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, race, class: charClass, level, background })
-      });
-      const data = await res.json();
-      
-      if (data.character) {
-        setMode('list');
-        loadCharacters();
-        clearForm();
-      }
-    } catch (e) {
-      setError('Failed to create');
     } finally {
       setLoading(false);
     }
   };
-  
+
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this character?')) return;
     
@@ -78,254 +52,84 @@ export default function CharacterManager() {
       const res = await fetch(`/api/characters?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setCharacters(characters.filter(c => c.id !== id));
-        setMode('list');
       }
     } catch (e) {
-      setError('Failed to delete');
+      console.error('Delete failed:', e);
     }
   };
-  
-  const handleClone = (character: Character) => {
-    setName(character.name + ' (Copy)');
-    setRace(character.race || '');
-    setCharClass(character.class || '');
-    setLevel(character.level || 1);
-    setBackground(character.background || '');
-    setMode('create');
-  };
-  
-  const handleEdit = (character: Character) => {
-    setSelectedCharacter(character);
-    setName(character.name);
-    setRace(character.race || '');
-    setCharClass(character.class || '');
-    setLevel(character.level || 1);
-    setBackground(character.background || '');
-    setMode('edit');
-  };
-  
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCharacter) return;
-    
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/characters?id=${selectedCharacter.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, race, class: charClass, level, background })
-      });
-      const data = await res.json();
-      
-      if (data.character) {
-        setMode('list');
-        loadCharacters();
-        clearForm();
-      }
-    } catch (e) {
-      setError('Failed to update');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const clearForm = () => {
-    setName('');
-    setRace('');
-    setCharClass('');
-    setLevel(1);
-    setBackground('');
-    setSelectedCharacter(null);
-  };
-  
-  const generateRandom = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/character-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'random' })
-      });
-      const data = await res.json();
-      
-      if (data.character) {
-        const c = data.character;
-        setName(c.name || 'New Character');
-        setRace(c.race || '');
-        setCharClass(c.class || '');
-        setLevel(c.level || 1);
-        setBackground(c.background || '');
-      }
-    } catch (e) {
-      setError('Failed to generate');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white">Loading characters...</div>
+      </div>
+    );
+  }
+
   return (
-    <main className="min-h-screen flex flex-col">
-      <header className="bg-tertiary border-b border-border p-md">
-        <div className="container">
+    <main className="min-h-screen bg-slate-900">
+      <header className="bg-slate-800 border-b border-slate-700 p-4">
+        <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
-            <h2 className="text-gold">🛡️ Character Manager</h2>
-            <button onClick={() => router.push('/dashboard')} className="btn btn-secondary text-sm">
-              ← Dashboard
+            <h2 className="text-white text-xl font-bold">🛡️ Character Manager</h2>
+            <button 
+              onClick={() => router.push('/characters/create')} 
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              + Create Character
             </button>
           </div>
         </div>
       </header>
       
-      <div className="container flex-1 py-lg">
-        {/* List Mode */}
-        {mode === 'list' && (
-          <div className="grid gap-lg" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+      <div className="max-w-6xl mx-auto p-6">
+        {characters.length === 0 ? (
+          <div className="text-center text-slate-400 p-8">
+            <p className="mb-4">No characters yet.</p>
+            <button 
+              onClick={() => router.push('/characters/create')}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Create Your First Character
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {characters.map(char => (
-              <div key={char.id} className="card">
-                <div className="card-header">
-                  <span className="text-gold">{char.name}</span>
+              <div key={char.id} className="bg-slate-800 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-white font-semibold">{char.name}</h3>
+                  <span className="text-xs text-purple-400 uppercase bg-purple-900/50 px-2 py-1 rounded">
+                    {char.creation_mode || 'manual'}
+                  </span>
                 </div>
-                <div className="flex flex-col gap-sm text-sm">
-                  <div><span className="text-muted">Race:</span> {char.race || '-'}</div>
-                  <div><span className="text-muted">Class:</span> {char.class || '-'}</div>
-                  <div><span className="text-muted">Level:</span> {char.level || 1}</div>
-                  <div><span className="text-muted">Background:</span> {char.background || '-'}</div>
+                
+                {char.game_system_name && (
+                  <p className="text-slate-400 text-sm mb-2">{char.game_system_name}</p>
+                )}
+                
+                <div className="text-sm text-slate-400 space-y-1">
+                  <div>Race: {char.summary?.race || '-'}</div>
+                  <div>Class: {char.summary?.class || '-'}</div>
+                  <div>Level: {char.summary?.level || 1}</div>
                 </div>
-                <div className="flex gap-sm mt-md">
-                  <button onClick={() => handleEdit(char)} className="btn btn-secondary flex-1">
+                
+                <div className="flex gap-2 mt-4">
+                  <button 
+                    onClick={() => router.push(`/characters/${char.id}`)}
+                    className="flex-1 px-3 py-1 bg-slate-700 text-white text-sm rounded hover:bg-slate-600"
+                  >
                     Edit
                   </button>
-                  <button onClick={() => handleClone(char)} className="btn btn-secondary flex-1">
-                    Clone
-                  </button>
-                  <button onClick={() => handleDelete(char.id)} className="btn btn-danger">
-                    🗑
+                  <button 
+                    onClick={() => handleDelete(char.id)} 
+                    className="px-3 py-1 bg-red-900/50 text-red-400 text-sm rounded hover:bg-red-900"
+                  >
+                    Delete
                   </button>
                 </div>
               </div>
             ))}
-            
-            <button onClick={() => { clearForm(); setMode('create'); }} className="card card-dashed flex items-center justify-center" style={{ minHeight: '200px' }}>
-              <div className="text-center">
-                <div className="text-2xl">+</div>
-                <div className="text-muted">Create New Character</div>
-              </div>
-            </button>
-          </div>
-        )}
-        
-        {/* Create/Edit Mode */}
-        {(mode === 'create' || mode === 'edit') && (
-          <div className="card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <div className="card-header">
-              {mode === 'create' ? '✨' : '✏️'} {mode === 'create' ? 'Create' : 'Edit'} Character
-            </div>
-            
-            <form onSubmit={mode === 'create' ? handleCreate : handleUpdate}>
-              <div className="flex flex-col gap-md">
-                <button
-                  type="button"
-                  onClick={generateRandom}
-                  disabled={loading}
-                  className="btn btn-secondary"
-                >
-                  🎲 Generate Random with AI
-                </button>
-                
-                <div>
-                  <label className="block text-secondary mb-sm">Name *</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Grom the Brave"
-                    className="w-full"
-                    required
-                  />
-                </div>
-                
-                <div className="grid grid-2 gap-md">
-                  <div>
-                    <label className="block text-secondary mb-sm">Race</label>
-                    <select value={race} onChange={(e) => setRace(e.target.value)} className="w-full">
-                      <option value="">Select...</option>
-                      <option value="Human">Human</option>
-                      <option value="Elf">Elf</option>
-                      <option value="Dwarf">Dwarf</option>
-                      <option value="Halfling">Halfling</option>
-                      <option value="Dragonborn">Dragonborn</option>
-                      <option value="Gnome">Gnome</option>
-                      <option value="Half-Elf">Half-Elf</option>
-                      <option value="Half-Orc">Half-Orc</option>
-                      <option value="Tiefling">Tiefling</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-secondary mb-sm">Class</label>
-                    <select value={charClass} onChange={(e) => setCharClass(e.target.value)} className="w-full">
-                      <option value="">Select...</option>
-                      <option value="Fighter">Fighter</option>
-                      <option value="Wizard">Wizard</option>
-                      <option value="Rogue">Rogue</option>
-                      <option value="Cleric">Cleric</option>
-                      <option value="Paladin">Paladin</option>
-                      <option value="Ranger">Ranger</option>
-                      <option value="Bard">Bard</option>
-                      <option value="Barbarian">Barbarian</option>
-                      <option value="Druid">Druid</option>
-                      <option value="Monk">Monk</option>
-                      <option value="Sorcerer">Sorcerer</option>
-                      <option value="Warlock">Warlock</option>
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-2 gap-md">
-                  <div>
-                    <label className="block text-secondary mb-sm">Level</label>
-                    <input
-                      type="number"
-                      value={level}
-                      onChange={(e) => setLevel(parseInt(e.target.value) || 1)}
-                      min={1}
-                      max={20}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-secondary mb-sm">Background</label>
-                    <select value={background} onChange={(e) => setBackground(e.target.value)} className="w-full">
-                      <option value="">Select...</option>
-                      <option value="Acolyte">Acolyte</option>
-                      <option value="Criminal">Criminal</option>
-                      <option value="Sage">Sage</option>
-                      <option value="Soldier">Soldier</option>
-                      <option value="Urchin">Urchin</option>
-                      <option value="Noble">Noble</option>
-                      <option value="Entertainer">Entertainer</option>
-                      <option value="Folk Hero">Folk Hero</option>
-                    </select>
-                  </div>
-                </div>
-                
-                {error && <div className="text-crimson">{error}</div>}
-                
-                <div className="flex gap-md">
-                  <button
-                    type="button"
-                    onClick={() => { setMode('list'); clearForm(); }}
-                    className="btn btn-secondary flex-1"
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={loading} className="btn btn-primary flex-1">
-                    {loading ? 'Saving...' : mode === 'create' ? 'Create' : 'Update'}
-                  </button>
-                </div>
-              </div>
-            </form>
           </div>
         )}
       </div>

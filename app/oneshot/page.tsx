@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+interface GameSystem {
+  id: number;
+  name: string;
+  short_name: string;
+  description: string;
+  icon: string;
+}
+
 interface Theme {
   key: string;
   name: string;
@@ -31,13 +39,19 @@ const presetThemes: Theme[] = [
   { key: 'surprise', name: 'Surprise Me', icon: '🎲', description: 'Let the AI choose a random adventure' },
 ];
 
-const races = ['Human', 'Elf', 'Dwarf', 'Halfling', 'Gnome', 'Half-Elf', 'Half-Orc', 'Tiefling', 'Dragonborn'];
-const classes = ['Fighter', 'Wizard', 'Rogue', 'Cleric', 'Paladin', 'Ranger', 'Bard', 'Barbarian', 'Druid', 'Monk', 'Sorcerer', 'Warlock'];
-const backgrounds = ['Soldier', 'Criminal', 'Sage', 'Acolyte', 'Outlander', 'Entertainer', 'Folk Hero', 'Noble', 'Urchin'];
-
 export default function OneShotPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'theme' | 'character' | 'playing'>('theme');
+  const [step, setStep] = useState<'system' | 'theme' | 'character' | 'playing'>('system');
+  
+  // Game system state
+  const [gameSystems, setGameSystems] = useState<GameSystem[]>([]);
+  const [selectedSystem, setSelectedSystem] = useState<number | null>(null);
+  
+  // Catalog data for system
+  const [races, setRaces] = useState<string[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
+  const [backgrounds, setBackgrounds] = useState<string[]>([]);
+  
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [customTheme, setCustomTheme] = useState('');
   const [showCustom, setShowCustom] = useState(false);
@@ -54,6 +68,47 @@ export default function OneShotPage() {
   const [newCharBackground, setNewCharBackground] = useState('Soldier');
   const [newCharLoading, setNewCharLoading] = useState(false);
   
+  useEffect(() => {
+    loadGameSystems();
+  }, []);
+
+  const loadGameSystems = async () => {
+    try {
+      const res = await fetch('/api/game-systems?active_only=true');
+      const data = await res.json();
+      setGameSystems(data.systems || []);
+    } catch (e) {
+      console.error('Error loading game systems:', e);
+    }
+  };
+
+  const loadCatalogData = async (systemId: number) => {
+    try {
+      const [racesRes, classesRes, bgsRes] = await Promise.all([
+        fetch(`/api/game-systems/${systemId}/data?category=races`),
+        fetch(`/api/game-systems/${systemId}/data?category=classes`),
+        fetch(`/api/game-systems/${systemId}/data?category=backgrounds`)
+      ]);
+      const racesData = await racesRes.json();
+      const classesData = await classesRes.json();
+      const bgsData = await bgsRes.json();
+      setRaces((racesData.data || []).map((r: any) => r.name));
+      setClasses((classesData.data || []).map((c: any) => c.name));
+      setBackgrounds((bgsData.data || []).map((b: any) => b.name));
+    } catch (e) {
+      // Fallback to defaults
+      setRaces(['Human', 'Elf', 'Dwarf']);
+      setClasses(['Fighter', 'Wizard']);
+      setBackgrounds(['Soldier', 'Criminal']);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedSystem) {
+      loadCatalogData(selectedSystem);
+    }
+  }, [selectedSystem]);
+
   useEffect(() => {
     if (step === 'character') {
       loadCharacters();
