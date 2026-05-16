@@ -154,18 +154,40 @@ export default function CharacterWizard({
           Back
         </button>
         <button
-          onClick={() => {
+          onClick={async () => {
             // For AI guided, generate AI sections after user completes their sections
             if (mode === 'ai_guided' && currentStep === sections.length - 1) {
-              // TODO: Implement AI generation
-              setCurrentStep(currentStep + 1);
-            } else {
-              setCurrentStep(currentStep + 1);
+              setGenerating(true);
+              try {
+                const prefs = {
+                  ...characterData,
+                  ai_sections: aiSections,
+                };
+                const res = await fetch('/api/character-generate', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    mode: 'ai_guided',
+                    game_system_id: gameSystemId,
+                    preferences: prefs,
+                  }),
+                });
+                const data: any = await res.json();
+                if (data.character) {
+                  // Merge AI response into character data
+                  setCharacterData({ ...characterData, ...data.character });
+                }
+              } catch (e) {
+                console.error('AI generation failed:', e);
+              }
+              setGenerating(false);
             }
+            setCurrentStep(currentStep + 1);
           }}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+          disabled={generating}
         >
-          {mode === 'ai_guided' && currentStep === sections.length - 1 ? 'Generate with AI' : 'Next'}
+          {generating ? 'Generating...' : mode === 'ai_guided' && currentStep === sections.length - 1 ? 'Generate with AI' : 'Next'}
         </button>
       </div>
     </div>

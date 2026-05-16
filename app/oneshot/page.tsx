@@ -285,8 +285,68 @@ export default function OneShotPage() {
       setError(e.message || 'Failed to start adventure');
       setLoading(false);
     }
-  };
-  
+  }
+
+// No game systems available fallback
+  if (step === 'system' && gameSystems.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="text-white">No game systems available. Please import a game system first.</div>
+        </div>
+      </div>
+    );
+  }
+
+// Game System Selection Step
+  if (step === 'system') {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <header className="bg-slate-800 border-b border-slate-700">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-amber-400">⚔️ One-Shot Adventure</h1>
+              <p className="text-slate-400">A solo D&D adventure powered by AI</p>
+            </div>
+            <button onClick={() => router.push('/dashboard')} className="px-3 py-1 bg-slate-700 text-white text-sm rounded hover:bg-slate-600">
+              ← Dashboard
+            </button>
+          </div>
+        </header>
+        
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-white mb-4">Choose a Game System</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {gameSystems.map((sys) => (
+                <button
+                  key={sys.id}
+                  onClick={() => { setSelectedSystem(sys.id); setStep('theme'); }}
+                  className={`p-4 rounded-lg text-left transition ${
+                    selectedSystem === sys.id
+                      ? 'bg-purple-600 border-2 border-purple-500'
+                      : 'bg-slate-800 border-2 border-transparent hover:border-purple-500'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{sys.icon || '🎮'}</span>
+                    <div>
+                      <div className="text-white font-semibold">{sys.name}</div>
+                      {sys.short_name && (
+                        <div className="text-slate-400 text-sm">{sys.short_name}</div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
 // Theme Selection Step
   if (step === 'theme') {
     return (

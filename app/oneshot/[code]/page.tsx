@@ -9,6 +9,7 @@ interface Campaign {
   name: string;
   description: string;
   dm_name: string;
+  game_system_id?: number;
 }
 
 interface Player {
@@ -109,6 +110,7 @@ export default function OneShotGamePage() {
   const [currentModel, setCurrentModel] = useState<string>('');
   const [diceRolls, setDiceRolls] = useState<DiceRoll[]>([]);
   const [lastDice, setLastDice] = useState<{ dice: string; result: number } | null>(null);
+  const [gameSystemId, setGameSystemId] = useState<number | null>(null);
   
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -137,6 +139,7 @@ export default function OneShotGamePage() {
         return;
       }
       setCampaign(campaignData.campaign);
+      setGameSystemId(campaignData.campaign.game_system_id || null);
       const campaignId = campaignData.campaign.id;
       
       const aiRes = await fetch('/api/ai');
@@ -247,7 +250,7 @@ C. Third choice
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText, type: 'narrative', campaignId: campaign.id }),
+        body: JSON.stringify({ prompt: promptText, type: 'narrative', campaignId: campaign.id, game_system_id: gameSystemId }),
       });
       
       const data = await response.json();
@@ -308,6 +311,7 @@ C. Third choice
           prompt: `The player (${player.character_name || player.name}, level ${player.level || 1} ${player.race} ${player.class}) chose to: ${choice}.\n\nContinue the adventure. Describe what happens as a result of their action. Include any dice rolls needed (describe them narratively). If combat starts, describe the combat dramatically. If they meet an NPC, voice the NPC with personality.\n\nEnd with 2-4 new choices for the player.\n\nFormat:\n[NARRATIVE]\nYour narrative...\n[/NARRATIVE]\n[CHOICES]\nA. First choice\nB. Second choice\nC. Third choice\n[/CHOICES]`,
           type: 'narrative',
           campaignId: campaign.id,
+          game_system_id: gameSystemId,
         }),
       });
       
@@ -370,6 +374,7 @@ C. Third choice
           prompt: `The player (${player.character_name || player.name}, level ${player.level || 1} ${player.race} ${player.class}) chose to do this: ${prompt}.\n\nContinue the adventure. Describe what happens as a result of their action. Include any dice rolls needed (describe them narratively). If combat starts, describe the combat dramatically. If they meet an NPC, voice the NPC with personality.\n\nEnd with 2-4 new choices for the player.\n\nFormat:\n[NARRATIVE]\nYour narrative...\n[/NARRATIVE]\n[CHOICES]\nA. First choice\nB. Second choice\nC. Third choice\n[/CHOICES]`,
           type: 'narrative',
           campaignId: campaign.id,
+          game_system_id: gameSystemId,
         }),
       });
       

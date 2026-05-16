@@ -69,19 +69,37 @@ export default function PlayerPortal() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Game system
+  const [gameSystemId, setGameSystemId] = useState<number | null>(null);
+  const [races, setRaces] = useState<string[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
+  const [backgrounds, setBackgrounds] = useState<string[]>([]);
 
   // Load campaign and saved characters
   useEffect(() => {
     async function load() {
       try {
-        const [campaignRes, charactersRes] = await Promise.all([
-          fetch(`/api/campaigns/${code}`),
-          fetch(`/api/characters`),
-        ]);
+        // Load campaign first
+        const campaignRes = await fetch(`/api/campaigns/${code}`);
+        const campaignData: any = await campaignRes.json();
         
-        const campaignData = await campaignRes.json();
-        if (campaignData.campaign) setCampaign(campaignData.campaign);
+        if (campaignData.campaign) {
+          setCampaign(campaignData.campaign);
+          const gsid = campaignData.campaign.game_system_id;
+          setGameSystemId(gsid || null);
+          
+          // Load catalog data if game system exists
+          if (gsid) {
+            loadCatalogData(gsid);
+          }
+        }
         
+        // Load characters (filter by game system if available)
+        const charUrl = campaignData.campaign?.game_system_id 
+          ? `/api/characters?game_system_id=${campaignData.campaign.game_system_id}`
+          : '/api/characters';
+        const charactersRes = await fetch(charUrl);
         const charactersData = await charactersRes.json();
         if (charactersData.characters) setSavedCharacters(charactersData.characters);
       } catch (err) {
@@ -91,6 +109,27 @@ export default function PlayerPortal() {
     
     load();
   }, [code]);
+
+  const loadCatalogData = async (systemId: number) => {
+    try {
+      const [racesRes, classesRes, bgsRes] = await Promise.all([
+        fetch(`/api/game-systems/${systemId}/data?category=races`),
+        fetch(`/api/game-systems/${systemId}/data?category=classes`),
+        fetch(`/api/game-systems/${systemId}/data?category=backgrounds`),
+      ]);
+      const racesData: any = await racesRes.json();
+      const classesData: any = await classesRes.json();
+      const bgsData: any = await bgsRes.json();
+      setRaces((racesData.data || []).map((r: any) => r.name));
+      setClasses((classesData.data || []).map((c: any) => c.name));
+      setBackgrounds((bgsData.data || []).map((b: any) => b.name));
+    } catch (e) {
+      // Fallback to defaults
+      setRaces(['Human', 'Elf', 'Dwarf']);
+      setClasses(['Fighter', 'Wizard']);
+      setBackgrounds(['Soldier', 'Criminal']);
+    }
+  };
 
   const handleSelectCharacter = (character: Character) => {
     setSelectedCharacter(character);
@@ -111,6 +150,7 @@ export default function PlayerPortal() {
           race: characterRace,
           class: characterClass,
           background: characterBackground,
+          game_system_id: gameSystemId,
         }),
       });
       
