@@ -35,20 +35,29 @@ export async function GET() {
     let campaigns;
     if (isAdmin) {
       // Admin sees all campaigns
-      campaigns = db.prepare('SELECT * FROM campaigns ORDER BY updated_at DESC').all();
+      campaigns = db.prepare(`
+        SELECT c.*, gs.name as game_system_name, gs.icon as game_system_icon
+        FROM campaigns c
+        LEFT JOIN game_systems gs ON c.game_system_id = gs.id
+        ORDER BY c.updated_at DESC
+      `).all();
     } else if (userId) {
       // GM sees own campaigns + shared ones
       campaigns = db.prepare(`
-        SELECT * FROM campaigns 
-        WHERE owner_id = ? OR is_shared = 1 
-        ORDER BY updated_at DESC
+        SELECT c.*, gs.name as game_system_name, gs.icon as game_system_icon
+        FROM campaigns c
+        LEFT JOIN game_systems gs ON c.game_system_id = gs.id
+        WHERE c.owner_id = ? OR c.is_shared = 1 
+        ORDER BY c.updated_at DESC
       `).all(userId);
     } else {
       // No session - only shared campaigns
       campaigns = db.prepare(`
-        SELECT * FROM campaigns 
-        WHERE is_shared = 1 
-        ORDER BY updated_at DESC
+        SELECT c.*, gs.name as game_system_name, gs.icon as game_system_icon
+        FROM campaigns c
+        LEFT JOIN game_systems gs ON c.game_system_id = gs.id
+        WHERE c.is_shared = 1 
+        ORDER BY c.updated_at DESC
       `).all();
     }
     
@@ -82,7 +91,7 @@ export async function POST(request: NextRequest) {
     
     const userId = session.id;
     const body = await request.json();
-    const { name, description, game_system, is_shared } = body;
+    const { name, description, game_system, game_system_id, is_shared } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'Campaign name is required' }, { status: 400 });
@@ -98,9 +107,16 @@ export async function POST(request: NextRequest) {
       attempts++;
     } while (attempts < 10);
 
+    // Get default game system if not provided
+    let systemId = game_system_id;
+    if (!systemId) {
+      const defaultSystem = db.prepare('SELECT id FROM game_systems WHERE is_default = 1').get() as { id: number };
+      systemId = defaultSystem?.id || null;
+    }
+
     const stmt = db.prepare(`
-      INSERT INTO campaigns (owner_id, code, name, description, game_system, is_shared)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO campaigns (owner_id, code, name, description, game_system, game_system_id, is_shared)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -109,6 +125,7 @@ export async function POST(request: NextRequest) {
       name, 
       description || '',
       game_system || 'dnd5e',
+      systemId,
       is_shared ? 1 : 0
     );
     

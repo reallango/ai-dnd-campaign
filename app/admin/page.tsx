@@ -115,7 +115,7 @@ export default function AdminPage() {
   const [loadedModels, setLoadedModels] = useState<string[]>([]);
   const [checkingLoaded, setCheckingLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'aiConfig' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer'>('aiConfig');
+  const [activeTab, setActiveTab] = useState<'aiConfig' | 'users' | 'tokens' | 'email' | 'updates' | 'portainer' | 'gameSystems'>('aiConfig');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -711,6 +711,12 @@ export default function AdminPage() {
             className={`px-4 py-2 rounded-lg ${activeTab === 'portainer' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             🐳 Portainer
+          </button>
+          <button
+            onClick={() => setActiveTab('gameSystems')}
+            className={`px-4 py-2 rounded-lg ${activeTab === 'gameSystems' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            🎲 Game Systems
           </button>
           <button
             onClick={() => router.push('/dashboard')}
@@ -1315,12 +1321,219 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'gameSystems' && <GameSystemsTabContent />}
       </main>
     </div>
   );
 }
 
 // Sub-tab content components
+function GameSystemsTabContent() {
+  const [gameSystems, setGameSystems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStatus, setImportStatus] = useState('');
+  const [expandedSystem, setExpandedSystem] = useState<number | null>(null);
+
+  useEffect(() => { loadGameSystems(); }, []);
+
+  async function loadGameSystems() {
+    try {
+      const res = await fetch('/api/game-systems?active_only=false');
+      const data = await res.json();
+      setGameSystems(data.systems || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function importSystem(file: File) {
+    setImportStatus('Reading file...');
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      
+      setImportStatus('Importing...');
+      const res = await fetch('/api/game-systems', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(json),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setImportStatus(`Success! Imported ${data.system.categories_imported} categories.`);
+        loadGameSystems();
+        setTimeout(() => setShowImportModal(false), 1500);
+      } else {
+        setImportStatus(data.error || 'Import failed');
+      }
+    } catch (e: any) {
+      setImportStatus(e.message || 'Import failed');
+    }
+  }
+
+  async function toggleActive(systemId: number, currentActive: number) {
+    try {
+      await fetch(`/api/game-systems/${systemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: currentActive ? 0 : 1 }),
+      });
+      loadGameSystems();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function setDefault(systemId: number) {
+    try {
+      await fetch(`/api/game-systems/${systemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_default: 1 }),
+      });
+      loadGameSystems();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function deleteSystem(systemId: number, systemName: string) {
+    if (!confirm(`Delete ${systemName}? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/game-systems/${systemId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        loadGameSystems();
+      } else {
+        alert(data.error || 'Delete failed');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if (loading) {
+    return <div className="text-white">Loading...</div>;
+  }
+
+  return (
+    <div className="bg-slate-800 rounded-lg p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-white">Game Systems</h2>
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+        >
+          Import System
+        </button>
+      </div>
+
+      {gameSystems.length === 0 ? (
+        <p className="text-slate-400">No game systems installed. Import one to get started.</p>
+      ) : (
+        <div className="space-y-4">
+          {gameSystems.map((system) => (
+            <div key={system.id} className="bg-slate-700/50 rounded-lg p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{system.icon || '🎲'}</span>
+                    <h3 className="text-lg font-semibold text-white">{system.name}</h3>
+                    {system.is_default === 1 && (
+                      <span className="px-2 py-0.5 bg-purple-900/50 text-purple-300 text-xs rounded">Default</span>
+                    )}
+                    {system.is_active === 0 && (
+                      <span className="px-2 py-0.5 bg-slate-600 text-slate-400 text-xs rounded">Inactive</span>
+                    )}
+                  </div>
+                  <p className="text-slate-400 text-sm mt-1">{system.description}</p>
+                  <div className="text-slate-500 text-xs mt-2">
+                    v{system.version} · {system.genre} · Installed {new Date(system.installed_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toggleActive(system.id, system.is_active)}
+                    className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500"
+                  >
+                    {system.is_active ? 'Disable' : 'Enable'}
+                  </button>
+                  {system.is_default !== 1 && (
+                    <button
+                      onClick={() => setDefault(system.id)}
+                      className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500"
+                    >
+                      Set Default
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setExpandedSystem(expandedSystem === system.id ? null : system.id)}
+                    className="px-3 py-1 bg-slate-600 text-white text-sm rounded hover:bg-slate-500"
+                  >
+                    {expandedSystem === system.id ? 'Collapse' : 'Expand'}
+                  </button>
+                  {system.system_key !== 'generic' && (
+                    <button
+                      onClick={() => deleteSystem(system.id, system.name)}
+                      className="px-3 py-1 bg-red-900/50 text-red-400 text-sm rounded hover:bg-red-900"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+              {expandedSystem === system.id && (
+                <div className="mt-4 pt-4 border-t border-slate-600">
+                  <p className="text-slate-400 text-sm">Loading category details...</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-white mb-4">Import Game System</h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Upload a JSON file containing a complete game system package.
+            </p>
+            <input
+              type="file"
+              accept=".json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) importSystem(file);
+              }}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white mb-4"
+            />
+            {importStatus && (
+              <p className={`text-sm mb-4 ${importStatus.includes('Success') ? 'text-green-400' : 'text-yellow-400'}`}>
+                {importStatus}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowImportModal(false); setImportStatus(''); }}
+                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InstancesTabContent() {
   const [aiInstances, setAiInstances] = useState<OllamaInstance[]>([]);
   const [aiModels, setAiModels] = useState<AvailableModel[]>([]);

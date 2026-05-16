@@ -110,6 +110,9 @@ export interface GameContext {
   characters: CharacterInfo[];
   recentNarrative: NarrativeEntry[];
   sessionNotes: string;
+  // Game system fields (new in Phase 5)
+  gameSystemId?: number;
+  gameSystemContext?: string;
 }
 
 export interface CharacterInfo {

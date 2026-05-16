@@ -8,11 +8,45 @@ export function buildContext(campaignId: number, sessionId?: number): GameContex
   
   // Get campaign
   const campaign = database.prepare(`
-    SELECT id, name FROM campaigns WHERE id = ?
-  `).get(campaignId) as { id: number; name: string } | undefined;
+    SELECT id, name, game_system_id FROM campaigns WHERE id = ?
+  `).get(campaignId) as { id: number; name: string; game_system_id: number | null } | undefined;
   
   if (!campaign) {
     return null;
+  }
+
+  // Get game system context
+  let gameSystemContext = '';
+  if (campaign.game_system_id) {
+    try {
+      // Get AI context
+      const aiContextRow = database.prepare(
+        'SELECT data FROM game_system_data WHERE system_id = ? AND category = ?'
+      ).get(campaign.game_system_id, 'ai_context') as { data: string } | undefined;
+      
+      if (aiContextRow?.data) {
+        try {
+          const aiData = JSON.parse(aiContextRow.data);
+          gameSystemContext = aiData.instructions || aiData.rules || '';
+        } catch (e) {}
+      }
+      
+      // Get rules reference if available
+      const rulesRow = database.prepare(
+        'SELECT data FROM game_system_data WHERE system_id = ? AND category = ?'
+      ).get(campaign.game_system_id, 'rules_reference') as { data: string } | undefined;
+      
+      if (rulesRow?.data) {
+        // Truncate if over 4000 chars
+        let rules = rulesRow.data;
+        if (rules.length > 4000) {
+          rules = rules.substring(0, 4000) + '\n[truncated...]';
+        }
+        gameSystemContext += '\n\n' + rules;
+      }
+    } catch (e) {
+      // Ignore errors - context is optional
+    }
   }
 
   // Get active session if not provided
@@ -25,7 +59,7 @@ export function buildContext(campaignId: number, sessionId?: number): GameContex
     `).get(campaignId) as { id: number; mode: string } | undefined;
     
     if (!session) {
-      return { campaignId: campaign.id, campaignName: campaign.name, sessionId: 0, mode: 'live', characters: [], recentNarrative: [], sessionNotes: '' };
+      return { campaignId: campaign.id, campaignName: campaign.name, sessionId: 0, mode: 'live', characters: [], recentNarrative: [], sessionNotes: '', gameSystemId: campaign.game_system_id, gameSystemContext };
     }
     
     activeSessionId = session.id;
@@ -87,7 +121,9 @@ export function buildContext(campaignId: number, sessionId?: number): GameContex
     mode: session?.mode || 'live',
     characters,
     recentNarrative,
-    sessionNotes: notesRows?.notes || ''
+    sessionNotes: notesRows?.notes || '',
+    gameSystemId: campaign.game_system_id,
+    gameSystemContext: gameSystemContext
   };
 }
 
@@ -98,7 +134,14 @@ export function formatGameContext(context: GameContext): string {
   // Campaign header
   lines.push(`# Campaign: ${context.campaignName}`);
   lines.push(`Session Mode: ${context.mode}`);
-  lines.push('');
+
+  // Game system context (if available)
+  if (context.gameSystemContext) {
+    lines.push('');
+    lines.push('## Game System Rules');
+    lines.push(context.gameSystemContext);
+    lines.push('');
+  }
 
   // Characters
   if (context.characters.length > 0) {

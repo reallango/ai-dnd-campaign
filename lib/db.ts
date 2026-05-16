@@ -27,6 +27,14 @@ export function initDb() {
   try {
     db.exec(`ALTER TABLE users ADD COLUMN password_reset_expires DATETIME`);
   } catch (e) { /* column may already exist */ }
+  try {
+    db.exec(`ALTER TABLE campaigns ADD COLUMN game_system_id INTEGER REFERENCES game_systems(id)`);
+  } catch (e) { /* column may already exist */ }
+
+  // Set default game_system_id for existing campaigns
+  try {
+    db.exec(`UPDATE campaigns SET game_system_id = (SELECT id FROM game_systems WHERE is_default = 1 LIMIT 1) WHERE game_system_id IS NULL`);
+  } catch (e) { /* ignore */ }
   
   // Run AI configuration migration
   try {
@@ -34,6 +42,22 @@ export function initDb() {
     runAIMigration(db);
   } catch (e) {
     console.log('AI migration:', e);
+  }
+
+  // Run Game System migration
+  try {
+    const { runGameSystemMigration } = require('./game-system-migration');
+    runGameSystemMigration(db);
+  } catch (e) {
+    console.log('Game system migration:', e);
+  }
+
+  // Run Character migration
+  try {
+    const { runCharacterMigration } = require('./character-migration');
+    runCharacterMigration(db);
+  } catch (e) {
+    console.log('Character migration:', e);
   }
   
   db.exec(`

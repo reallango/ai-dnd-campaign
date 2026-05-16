@@ -1,46 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-
-// Dice notation parser
-function parseDice(dice: string): { count: number; sides: number; modifier: number } {
-  const match = dice.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-  if (!match) {
-    throw new Error('Invalid dice notation. Use format like "2d6+3"');
-  }
-  return {
-    count: parseInt(match[1]),
-    sides: parseInt(match[2]),
-    modifier: match[3] ? parseInt(match[3]) : 0
-  };
-}
-
-function rollDice(count: number, sides: number): number[] {
-  const rolls: number[] = [];
-  for (let i = 0; i < count; i++) {
-    rolls.push(Math.floor(Math.random() * sides) + 1);
-  }
-  return rolls;
-}
+import { rollDice, rollWithAdvantage, rollWithDisadvantage, rollStatArray, DiceRollResult } from '@/lib/dice-engine';
 
 // POST /api/dice - Roll dice
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { campaign_id, player_id, dice, label, is_anonymous } = body;
+    const { campaign_id, player_id, dice, label, is_anonymous, stat_gen } = body;
     
-    if (!campaign_id || !dice) {
+    let result: DiceRollResult;
+    
+    // Handle stat generation mode
+    if (stat_gen?.method && stat_gen?.game_system_id) {
+      // Get the stat generation method from game system config
+      const sysRow = db.prepare('SELECT config FROM game_systems WHERE id = ?').get(stat_gen.game_system_id) as { config: string } | undefined;
+      
+      let config: any = {};
+      if (sysRow?.config) {
+        try { config = JSON.parse(sysRow.config); } catch (e) {}
+      }
+      
+      const method = config?.stat_generation_methods?.find((m: any) => m.key === stat_gen.method);
+      
+      if (!method) {
+        // Use default 4d6 drop lowest
+        result = rollDice('4d6kh3');
+      } else {
+        const { rolls, totals } = rollStatArray(method);
+        // Return the rolled stat array
+        return NextResponse.json({
+          dice: {
+            is_stat_gen: true,
+            method: stat_gen.method,
+            rolls,
+            totals,
+            average: totals.reduce((a, b) => a + b, 0) / totals.length
+          }
+        }, { status: 201 });
+      }
+    } else if (dice === 'advantage') {
+      const advResult = rollWithAdvantage();
+      result = {
+        expression: '2d20kh1 (Advantage)',
+        rolls: [advResult.roll1, advResult.roll2],
+        kept: [advResult.result],
+        dropped: [advResult.roll1 === advResult.result ? advResult.roll2 : advResult.roll1],
+        modifier: 0,
+        total: advResult.result,
+        breakdown: `[${advResult.roll1}, ${advResult.roll2}] advantage → ${advResult.result}`,
+        criticalHit: advResult.result === 20,
+        criticalFail: advResult.result === 1
+      };
+    } else if (dice === 'disadvantage') {
+      const disResult = rollWithDisadvantage();
+      result = {
+        expression: '2d20kl1 (Disadvantage)',
+        rolls: [disResult.roll1, disResult.roll2],
+        kept: [disResult.result],
+        dropped: [disResult.roll1 === disResult.result ? disResult.roll2 : disResult.roll1],
+        modifier: 0,
+        total: disResult.result,
+        breakdown: `[${disResult.roll1}, ${disResult.roll2}] disadvantage → ${disResult.result}`,
+        criticalHit: false,
+        criticalFail: disResult.result === 1
+      };
+    } else if (!campaign_id || !dice) {
       return NextResponse.json({ error: 'campaign_id and dice are required' }, { status: 400 });
+    } else {
+      result = rollDice(dice);
     }
     
-    const { count, sides, modifier } = parseDice(dice);
-    const rolls = rollDice(count, sides);
-    const rollSum = rolls.reduce((a, b) => a + b, 0);
-    const result = rollSum + modifier;
-    
-    const breakdown = modifier !== 0 
-      ? `[${rolls.join('+')}${modifier > 0 ? '+' : ''}${modifier}] = ${rollSum}${modifier > 0 ? '+' : ''}${modifier}`
-      : `[${rolls.join('+')}] = ${rollSum}`;
-    
+    // Save to database
     const stmt = db.prepare(`
       INSERT INTO dice_rolls (campaign_id, player_id, dice, result, breakdown, label, is_anonymous)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -49,9 +79,9 @@ export async function POST(request: NextRequest) {
     const dbResult = stmt.run(
       campaign_id,
       player_id || null,
-      dice,
-      result,
-      breakdown,
+      result.expression,
+      result.total,
+      result.breakdown,
       label || '',
       is_anonymous ? 1 : 0
     );
@@ -59,12 +89,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       dice: {
         id: dbResult.lastInsertRowid,
-        dice,
-        result,
-        breakdown,
+        dice: result.expression,
+        result: result.total,
+        breakdown: result.breakdown,
         label,
         is_anonymous: is_anonymous ? 1 : 0,
-        rolls
+        rolls: result.rolls,
+        kept: result.kept,
+        criticalHit: result.criticalHit,
+        criticalFail: result.criticalFail
       }
     }, { status: 201 });
   } catch (error) {

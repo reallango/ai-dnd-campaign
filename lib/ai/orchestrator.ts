@@ -42,7 +42,7 @@ When uncertain, default to "dm". Respond with ONLY the JSON object.`;
  */
 export async function orchestrate(
   userPrompt: string,
-  gameContext?: { campaignId: number; sessionId?: number },
+  gameContext?: { campaignId: number; sessionId?: number; gameSystemId?: number },
   maxTokens?: number
 ): Promise<{ content: string; model: string; instance: string; agent: string; classification?: ActionClassification }> {
   

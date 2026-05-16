@@ -8,7 +8,7 @@ import { checkAIAvailability } from '@/lib/ai';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, type, campaignId, sessionId, maxTokens } = body;
+    const { prompt, type, campaignId, sessionId, maxTokens, game_system_id } = body;
     
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     if (type === 'direct' && body.roleKey) {
       // Direct mode: bypass orchestrator, call specific agent (used by admin test)
       const result = await routeTask(body.roleKey, prompt, 
-        campaignId ? { campaignId: parseInt(campaignId), sessionId: sessionId ? parseInt(sessionId) : undefined } : undefined, 
+        campaignId ? { campaignId: parseInt(campaignId), sessionId: sessionId ? parseInt(sessionId) : undefined, gameSystemId: game_system_id ? parseInt(game_system_id) : undefined } : undefined, 
         undefined, maxTokens);
       return NextResponse.json({
         content: result.content,
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     
     // Orchestrated mode: DM classifies, then routes to appropriate agent
     const gameContext = campaignId
-      ? { campaignId: parseInt(campaignId), sessionId: sessionId ? parseInt(sessionId) : undefined }
+      ? { campaignId: parseInt(campaignId), sessionId: sessionId ? parseInt(sessionId) : undefined, gameSystemId: game_system_id ? parseInt(game_system_id) : undefined }
       : undefined;
     
     const result = await orchestrate(prompt, gameContext, maxTokens);
