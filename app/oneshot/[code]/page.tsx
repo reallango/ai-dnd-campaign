@@ -105,6 +105,8 @@ export default function OneShotGamePage() {
   const [narratives, setNarratives] = useState<NarrativeEntry[]>([]);
   const [currentNarrative, setCurrentNarrative] = useState('');
   const [currentChoices, setCurrentChoices] = useState<string[]>([]);
+  const [currentAgent, setCurrentAgent] = useState<string>('');
+  const [currentModel, setCurrentModel] = useState<string>('');
   const [diceRolls, setDiceRolls] = useState<DiceRoll[]>([]);
   const [lastDice, setLastDice] = useState<{ dice: string; result: number } | null>(null);
   
@@ -254,6 +256,8 @@ C. Third choice
         const parsed = parseAIResponse(data.content);
         setCurrentNarrative(parsed.narrative);
         setCurrentChoices(parsed.choices);
+        setCurrentAgent(data.agent || '');
+        setCurrentModel(data.model || '');
         
         const saveRes = await fetch(`/api/narratives/${campaign.id}`, {
           method: 'POST',
@@ -261,7 +265,7 @@ C. Third choice
           body: JSON.stringify({
             type: 'ai',
             content: parsed.narrative,
-            metadata: { fullResponse: data.content, choices: parsed.choices },
+            metadata: { fullResponse: data.content, choices: parsed.choices, agent: data.agent, model: data.model },
           }),
         });
         const saved = await saveRes.json();
@@ -313,6 +317,8 @@ C. Third choice
         const parsed = parseAIResponse(data.content);
         setCurrentNarrative(parsed.narrative);
         setCurrentChoices(parsed.choices);
+        setCurrentAgent(data.agent || '');
+        setCurrentModel(data.model || '');
         
         const saveRes = await fetch(`/api/narratives/${campaign.id}`, {
           method: 'POST',
@@ -320,7 +326,7 @@ C. Third choice
           body: JSON.stringify({
             type: 'ai',
             content: parsed.narrative,
-            metadata: { fullResponse: data.content, choices: parsed.choices },
+            metadata: { fullResponse: data.content, choices: parsed.choices, agent: data.agent, model: data.model },
           }),
         });
         const saved = await saveRes.json();
@@ -373,6 +379,8 @@ C. Third choice
         const parsed = parseAIResponse(data.content);
         setCurrentNarrative(parsed.narrative);
         setCurrentChoices(parsed.choices);
+        setCurrentAgent(data.agent || '');
+        setCurrentModel(data.model || '');
         
         const saveRes = await fetch(`/api/narratives/${campaign.id}`, {
           method: 'POST',
@@ -380,7 +388,7 @@ C. Third choice
           body: JSON.stringify({
             type: 'ai',
             content: parsed.narrative,
-            metadata: { fullResponse: data.content, choices: parsed.choices },
+            metadata: { fullResponse: data.content, choices: parsed.choices, agent: data.agent, model: data.model },
           }),
         });
         const saved = await saveRes.json();
@@ -501,6 +509,15 @@ C. Third choice
             <div className="text-slate-200 text-lg whitespace-pre-wrap leading-relaxed">
               {currentNarrative}
             </div>
+            {currentAgent && (
+              <span className="text-xs text-slate-500 mt-1 block">
+                {currentAgent === 'narrator' ? '🎭 Narrator' : 
+                  currentAgent === 'combat' ? '⚔️ Combat Master' :
+                  currentAgent === 'npc' ? '🧙 NPC Generator' : 
+                  currentAgent === 'state' ? '📊 State Manager' : '🎯 Dungeon Master'}
+                {currentModel ? ` (${currentModel})` : ''}
+              </span>
+            )}
           </div>
         )}
         
